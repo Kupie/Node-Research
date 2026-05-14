@@ -32,6 +32,9 @@ namespace BetterResearchMenu
         public static Texture2D TexBubble = ContentFinder<Texture2D>.Get("UI/Bubble");
         public static Texture2D TexBarBg = SolidColorMaterials.NewSolidColorTexture(new Color(0.1f, 0.1f, 0.1f));
         public static Texture2D TexBarFill = SolidColorMaterials.NewSolidColorTexture(Color.green);
+        public static Texture2D TexSpacing = ContentFinder<Texture2D>.Get("UI/SpacingSlider");
+        public static Texture2D TexContracting = ContentFinder<Texture2D>.Get("UI/ContractingSlider");
+        private static Texture2D texGradient;
         public static Dictionary<TechLevel, Texture2D> TechLevelIcons = new Dictionary<TechLevel, Texture2D>
         {
             { TechLevel.Animal, ContentFinder<Texture2D>.Get("UI/TechLevels/Animal") },
@@ -42,6 +45,13 @@ namespace BetterResearchMenu
             { TechLevel.Ultra, ContentFinder<Texture2D>.Get("UI/TechLevels/Ultra") },
             { TechLevel.Archotech, ContentFinder<Texture2D>.Get("UI/TechLevels/Archotech") }
         };
+
+        static MainTabWindow_BetterResearch()
+        {
+            texGradient = new Texture2D(1, 2);
+            texGradient.SetPixels(new[] { Color.black, Color.white });
+            texGradient.Apply();
+        }
 
         public static List<TechLevel> AllTechLevels = Enum.GetValues(typeof(TechLevel)).Cast<TechLevel>().Where(tl => tl != TechLevel.Undefined).ToList();
         private float TopBarHeight => currentTab == DefsOf.Main ? 50f : 0f;
@@ -228,6 +238,7 @@ namespace BetterResearchMenu
             var maxRepulsionDistance = 500f;
             var dampingFactor = 0.9f;
             var gravity = 0.02f;
+            var clingMultiplier = 20f;
 
             velocitySum = 0f;
             foreach (var node in nodes)
@@ -248,7 +259,7 @@ namespace BetterResearchMenu
                     if (dist < minDistance) { dir = Rand.UnitVector2; dist = minDistance; }
 
                     if (dist < maxRepulsionDistance)
-                        force += dir / dist * ((k * k) / dist) * BetterResearchMenuMod.settings.repelForceMultiplier;
+                        force += dir / dist * ((k * k) / dist) * BetterResearchMenuMod.settings.spacingForceMultiplier;
                 }
 
                 foreach (var edge in edges)
@@ -260,7 +271,11 @@ namespace BetterResearchMenu
                     var dist = dir.magnitude;
                     if (dist > 5f)
                     {
-                        force += dir / dist * ((dist * dist) / k);
+                        var strength = BetterResearchMenuMod.settings.contractingForceMultiplier;
+                        if (node.state == NodeState.Dot || node.state == NodeState.Minimized)
+                            strength *= clingMultiplier;
+
+                        force += dir / dist * ((dist * dist) / k) * strength;
                     }
                 }
 
@@ -302,7 +317,9 @@ namespace BetterResearchMenu
 
             var targetBgColor = currentTab == DefsOf.Anomaly ? ColorAnomalyBackground : currentTab == DefsOf.VGE_Gravtech ? ColorVGEBackground : ColorGraphBackground;
             currentBgColor = Color.Lerp(currentBgColor, targetBgColor, Time.deltaTime * 5f);
-            Widgets.DrawBoxSolid(inRect, currentBgColor);
+            GUI.color = currentBgColor;
+            GUI.DrawTexture(inRect, texGradient);
+            GUI.color = Color.white;
 
             var panelWidth = selectedNode != null ? RightPanelWidth : 0f;
             graphRect = new Rect(0f, TopBarHeight, inRect.width - panelWidth, inRect.height - TopBarHeight - BottomBarHeight);
@@ -340,6 +357,9 @@ namespace BetterResearchMenu
                                 {
                                     node.state = NodeState.Expanded;
                                     State.nodeStates[node.def.defName] = node.state;
+                                    selectedNode = node;
+                                    physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+                                    DefsOf.BRM_ExpandingNode.PlayOneShotOnCamera();
                                 }
                                 nodeClicked = true;
                                 Event.current.Use();
@@ -747,7 +767,6 @@ namespace BetterResearchMenu
             float iconSize = 60f;
             float iconExpansion = 4f;
             float iconPadding = 8f;
-            float labelXOffset = 100f;
             float labelWidth = 400f;
             float labelHeight = 30f;
             float barYOffset = 40f;
@@ -756,22 +775,41 @@ namespace BetterResearchMenu
 
             var bottomRect = new Rect(0f, inRect.height - BottomBarHeight, inRect.width, BottomBarHeight);
             Widgets.DrawBoxSolid(bottomRect, ColorBoxBackground);
+
+            var sliderAreaWidth = 200f;
+            var sliderHeight = 24f;
+            var spacingRect = new Rect(iconMargin, bottomRect.y + 10f, sliderAreaWidth, sliderHeight);
+            var contractingRect = new Rect(iconMargin, spacingRect.yMax + 5f, sliderAreaWidth, sliderHeight);
+
+            var iconS = 16f;
+            GUI.DrawTexture(new Rect(spacingRect.x - iconS - 2f, spacingRect.y + 2f, iconS, iconS), TexSpacing);
+            var oldSpacing = BetterResearchMenuMod.settings.spacingForceMultiplier;
+            BetterResearchMenuMod.settings.spacingForceMultiplier = Widgets.HorizontalSlider(spacingRect, BetterResearchMenuMod.settings.spacingForceMultiplier, 0.1f, 5f, true, "BRM_SpacingForceMultiplier".Translate(oldSpacing.ToString("F1")), null, null, 0.1f);
+
+            GUI.DrawTexture(new Rect(contractingRect.x - iconS - 2f, contractingRect.y + 2f, iconS, iconS), TexContracting);
+            var oldContract = BetterResearchMenuMod.settings.contractingForceMultiplier;
+            BetterResearchMenuMod.settings.contractingForceMultiplier = Widgets.HorizontalSlider(contractingRect, BetterResearchMenuMod.settings.contractingForceMultiplier, 0.1f, 5f, true, "BRM_ContractingForceMultiplier".Translate(oldContract.ToString("F1")), null, null, 0.1f);
+
+            if (oldSpacing != BetterResearchMenuMod.settings.spacingForceMultiplier || oldContract != BetterResearchMenuMod.settings.contractingForceMultiplier)
+                physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+
             var proj = Find.ResearchManager.currentProj;
             if (proj != null)
             {
+                var contentX = iconMargin + sliderAreaWidth + 20f;
                 GUI.color = ColorPanelIconTint;
-                GUI.DrawTexture(new Rect(iconMargin, bottomRect.y + iconYOffset, iconSize, iconSize).ExpandedBy(iconExpansion), TexBubble);
+                GUI.DrawTexture(new Rect(contentX, bottomRect.y + iconYOffset, iconSize, iconSize).ExpandedBy(iconExpansion), TexBubble);
                 GUI.color = ColorNodeBorder;
-                GUI.DrawTexture(new Rect(iconMargin, bottomRect.y + iconYOffset, iconSize, iconSize), TexBubble);
+                GUI.DrawTexture(new Rect(contentX, bottomRect.y + iconYOffset, iconSize, iconSize), TexBubble);
                 GUI.color = ColorPanelIconTint;
                 var icon = GetIcon(proj);
                 if (icon != null)
-                    GUI.DrawTexture(new Rect(iconMargin, bottomRect.y + iconYOffset, iconSize, iconSize).ContractedBy(iconPadding), icon);
+                    GUI.DrawTexture(new Rect(contentX, bottomRect.y + iconYOffset, iconSize, iconSize).ContractedBy(iconPadding), icon);
                 GUI.color = Color.white;
                 Text.Anchor = TextAnchor.MiddleLeft;
                 Text.Font = GameFont.Small;
-                Widgets.Label(new Rect(labelXOffset, bottomRect.y + iconYOffset, labelWidth, labelHeight), "BRM_CurrentlyResearching".Translate(proj.LabelCap));
-                var progRect = new Rect(labelXOffset, bottomRect.y + barYOffset, bottomRect.width - barWidthReduction, barHeight);
+                Widgets.Label(new Rect(contentX + 80f, bottomRect.y + iconYOffset, labelWidth, labelHeight), "BRM_CurrentlyResearching".Translate(proj.LabelCap));
+                var progRect = new Rect(contentX + 80f, bottomRect.y + barYOffset, bottomRect.width - contentX - 80f - barWidthReduction, barHeight);
                 Widgets.FillableBar(progRect, proj.ProgressPercent, TexBarFill, TexBarBg, true);
                 Text.Anchor = TextAnchor.MiddleCenter;
                 Widgets.Label(progRect, $"{proj.ProgressApparent:F0} / {proj.CostApparent:F0}");

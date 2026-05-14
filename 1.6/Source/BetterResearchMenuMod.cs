@@ -25,7 +25,6 @@ namespace BetterResearchMenu
             {
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);
             }
-            settings.repelForceMultiplier = ls.SliderLabeled("BRM_RepelForceMultiplier".Translate(settings.repelForceMultiplier.ToString("F1")), settings.repelForceMultiplier, 0.1f, 5f);
             ls.End();
         }
 

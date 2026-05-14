@@ -1,4 +1,5 @@
 using RimWorld;
+using Verse;
 
 namespace BetterResearchMenu
 {
@@ -11,6 +12,8 @@ namespace BetterResearchMenu
 
         [MayRequire("vanillaexpanded.gravship")]
         public static ResearchTabDef VGE_Gravtech;
+
+        public static SoundDef BRM_ExpandingNode;
 
         static DefsOf() => DefOfHelper.EnsureInitializedInCtor(typeof(DefsOf));
     }
