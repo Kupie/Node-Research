@@ -2,17 +2,17 @@
 <Defs>
   <SoundDef>
     <defName>BRM_ExpandingNode</defName>
-    <maxSimultaneous>1</maxSimultaneous>
+    <maxSimultaneous>99</maxSimultaneous>
     <subSounds>
       <li>
         <onCamera>True</onCamera>
         <grains>
           <li Class="AudioGrain_Clip">
-            <clipPath>UI/TinyBell</clipPath>
+            <clipPath>BRM_ExpandingNode</clipPath>
           </li>
         </grains>
-        <volumeRange>9~9</volumeRange>
-        <pitchRange>0.85~1.15</pitchRange>
+        <volumeRange>4~7</volumeRange>
+        <pitchRange>1.5~2</pitchRange>
       </li>
     </subSounds>
   </SoundDef>
