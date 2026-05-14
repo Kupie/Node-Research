@@ -11,7 +11,7 @@
             <clipPath>BRM_ExpandingNode</clipPath>
           </li>
         </grains>
-        <volumeRange>4~7</volumeRange>
+        <volumeRange>10~15</volumeRange>
         <pitchRange>1.5~2</pitchRange>
       </li>
     </subSounds>
@@ -24,11 +24,11 @@
         <onCamera>True</onCamera>
         <grains>
           <li Class="AudioGrain_Clip">
-            <clipPath>UI/TinyBell</clipPath>
+            <clipPath>BRM_CollapsingNode</clipPath>
           </li>
         </grains>
-        <volumeRange>9~9</volumeRange>
-        <pitchRange>0.85~1.15</pitchRange>
+        <volumeRange>25~30</volumeRange>
+        <pitchRange>0.3~0.7</pitchRange>
       </li>
     </subSounds>
   </SoundDef>
