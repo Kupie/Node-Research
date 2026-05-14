@@ -15,4 +15,8 @@
   <BRM_Researching>Researching...</BRM_Researching>
   <BRM_CurrentlyResearching>Currently researching: {0}</BRM_CurrentlyResearching>
   <BRM_FoundationsComplete>{0}/{1} foundations complete</BRM_FoundationsComplete>
+  <BRM_RepelForceMultiplier>Repel force multiplier: {0}</BRM_RepelForceMultiplier>
+  <BRM_RequiresDiscovery>This node requires discovery of something in the world.</BRM_RequiresDiscovery>
+  <BRM_AdvanceTo>Advance to {0}</BRM_AdvanceTo>
+  <BRM_Continue>Continue</BRM_Continue>
 </LanguageData>
