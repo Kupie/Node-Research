@@ -23,5 +23,6 @@
         <li>Ludeon.RimWorld.Anomaly</li>
         <li>Ludeon.RimWorld.Odyssey</li>
         <li>brrainz.harmony</li>
+        <li>oskarpotocki.vfe.tribals</li>
     </loadAfter>
 </ModMetaData>
