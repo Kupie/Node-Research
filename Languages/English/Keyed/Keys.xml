@@ -15,8 +15,8 @@
   <BRM_Researching>Researching...</BRM_Researching>
   <BRM_CurrentlyResearching>Currently researching: {0}</BRM_CurrentlyResearching>
   <BRM_FoundationsComplete>{0}/{1} foundations complete</BRM_FoundationsComplete>
-  <BRM_SpacingForceMultiplier>Spacing: {0}</BRM_SpacingForceMultiplier>
-  <BRM_ContractingForceMultiplier>Contracting: {0}</BRM_ContractingForceMultiplier>
   <BRM_RequiresDiscovery>This node requires discovery of something in the world.</BRM_RequiresDiscovery>
   <BRM_Continue>Continue</BRM_Continue>
+  <BRM_Foundation>FOUNDATION</BRM_Foundation>
+  <BRM_Points>{0} points</BRM_Points>
 </LanguageData>

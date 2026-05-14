@@ -9,7 +9,6 @@ namespace BetterResearchMenu
     {
         public static bool Prepare() => ModsConfig.IsActive("OskarPotocki.VFE.Tribals");
         public static MethodBase TargetMethod() => AccessTools.Method(AccessTools.TypeByName("VFETribals.GameComponent_Tribals"), "TryRegisterAdvancementObligation");
-
         public static bool Prefix() => !BetterResearchMenuMod.settings.disableVFETribalsAdvancement;
     }
 }

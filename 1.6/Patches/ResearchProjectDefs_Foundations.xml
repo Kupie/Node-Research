@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Patch>
   <Operation Class="PatchOperationAddModExtension">
-    <xpath>/Defs/ResearchProjectDef[defName="Electricity" or defName="MicroelectronicsBasics" or defName="Machining" or defName="MultiAnalyzer" or defName="Fabrication"]</xpath>
-    <value>
-      <li Class="BetterResearchMenu.ResearchFoundationExtension" />
-    </value>
-  </Operation>
-
-  <Operation Class="PatchOperationAddModExtension">
-    <xpath>/Defs/*[defName="VFET_Fire" or defName="VFET_Culture"]</xpath>
+    <xpath>/Defs/ResearchProjectDef[defName="Electricity" or defName="MicroelectronicsBasics" or defName="Machining" or defName="MultiAnalyzer" or defName="Fabrication" or defName="VFET_Fire" or defName="VFET_Culture"]</xpath>
     <value>
       <li Class="BetterResearchMenu.ResearchFoundationExtension" />
     </value>

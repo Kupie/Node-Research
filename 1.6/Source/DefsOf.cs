@@ -14,6 +14,7 @@ namespace BetterResearchMenu
         public static ResearchTabDef VGE_Gravtech;
 
         public static SoundDef BRM_ExpandingNode;
+        public static SoundDef BRM_CollapsingNode;
 
         static DefsOf() => DefOfHelper.EnsureInitializedInCtor(typeof(DefsOf));
     }
