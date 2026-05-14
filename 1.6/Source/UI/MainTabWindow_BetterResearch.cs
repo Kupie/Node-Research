@@ -12,6 +12,7 @@ namespace BetterResearchMenu
     {
         public ResearchProjectDef def;
         public Vector2 pos;
+        public Vector2 dampVelocity;
         public Vector2 drawPos;
         public Vector2 velocity;
         public NodeState state;
@@ -50,7 +51,9 @@ namespace BetterResearchMenu
         private float NodeSizeMinimized => 40f;
         private float NodeSizeDot => 20f;
         private static Color ColorBoxBackground => new ColorInt(38, 36, 36).ToColor;
-        private static Color ColorGraphBackground => new ColorInt(30, 35, 41).ToColor;
+        private static Color ColorGraphBackground => new ColorInt(15, 20, 26).ToColor;
+        private static Color ColorAnomalyBackground => new ColorInt(45, 25, 25).ToColor;
+        private static Color ColorVGEBackground => new ColorInt(25, 45, 45).ToColor;
         private static Color ColorEdgeFinished => new ColorInt(95, 99, 102).ToColor;
         private static Color ColorEdgeUnfinished => new ColorInt(95, 99, 102).ToColor;
         private static Color ColorNodeDot => new ColorInt(95, 99, 102).ToColor;
@@ -181,9 +184,9 @@ namespace BetterResearchMenu
         private void InitPhysicsLayout()
         {
             physicsTemperature = 100f;
-            for (var i = 0; i < 400; i++)
+            for (var i = 0; i < 500; i++)
             {
-                PhysicsTick();
+                PhysicsTick(0.016f);
             }
             foreach (var node in nodes)
             {
@@ -194,30 +197,46 @@ namespace BetterResearchMenu
         public override void WindowUpdate()
         {
             base.WindowUpdate();
-            PhysicsTick();
+            PhysicsTick(0.02f);
 
             foreach (var node in nodes)
             {
                 if (node.isDragging)
+                {
                     node.drawPos = node.pos;
+                    node.dampVelocity = Vector2.zero;
+                }
                 else
-                    node.drawPos = Vector2.Lerp(node.drawPos, node.pos, Time.deltaTime * 20f);
+                {
+                    node.drawPos = Vector2.SmoothDamp(node.drawPos, node.pos, ref node.dampVelocity, 0.05f);
+                }
+            }
+
+            if (physicsTemperature <= 0.1f)
+            {
+                foreach (var node in nodes)
+                    node.drawPos = node.pos;
             }
         }
 
-        private void PhysicsTick()
+        private void PhysicsTick(float dt)
         {
-            if (physicsTemperature < 0.05f) return;
+            if (physicsTemperature < 0.1f) { physicsTemperature = 0f; velocitySum = 0f; return; }
 
-            var k = 160f;
-            var minDistance = 0.1f;
+            var k = 180f;
+            var minDistance = 15f;
             var maxRepulsionDistance = 500f;
-            var dampingFactor = 0.5f;
-            var minForceThreshold = 0.01f;
+            var dampingFactor = 0.9f;
+            var gravity = 0.02f;
 
+            velocitySum = 0f;
             foreach (var node in nodes)
             {
-                if (node.isDragging || node.state == NodeState.Hidden) continue;
+                if (node.isDragging || node.state == NodeState.Hidden)
+                {
+                    node.velocity = Vector2.zero;
+                    continue;
+                }
 
                 var force = Vector2.zero;
 
@@ -226,7 +245,8 @@ namespace BetterResearchMenu
                     if (node == other || other.state == NodeState.Hidden) continue;
                     var dir = node.pos - other.pos;
                     var dist = dir.magnitude;
-                    if (dist < minDistance) { dir = new Vector2(Rand.Range(-1f, 1f), Rand.Range(-1f, 1f)).normalized; dist = minDistance; }
+                    if (dist < minDistance) { dir = Rand.UnitVector2; dist = minDistance; }
+
                     if (dist < maxRepulsionDistance)
                         force += dir / dist * ((k * k) / dist) * BetterResearchMenuMod.settings.repelForceMultiplier;
                 }
@@ -238,30 +258,37 @@ namespace BetterResearchMenu
                     if (other.state == NodeState.Hidden) continue;
                     var dir = other.pos - node.pos;
                     var dist = dir.magnitude;
-                    if (dist > minDistance)
+                    if (dist > 5f)
+                    {
                         force += dir / dist * ((dist * dist) / k);
+                    }
                 }
 
-                force.x += -node.pos.x * dampingFactor;
-                force.y += -node.pos.y * dampingFactor;
+                force -= node.pos * gravity;
 
-                node.velocity = force;
+                node.velocity = (node.velocity + force * dt) * dampingFactor;
+                velocitySum += node.velocity.sqrMagnitude;
             }
+
+            if (velocitySum < 0.5f) { physicsTemperature = 0f; return; }
 
             foreach (var node in nodes)
             {
                 if (node.isDragging || node.state == NodeState.Hidden) continue;
 
-                var mag = node.velocity.magnitude;
-                if (mag > minForceThreshold)
-                {
-                    node.pos += (node.velocity / mag) * Mathf.Min(mag, physicsTemperature);
-                    State.nodePositions[node.def.defName] = node.pos;
-                }
+                var move = node.velocity * dt * 2.5f;
+
+                float maxMove = physicsTemperature * 0.2f;
+                if (move.magnitude > maxMove) move = move.normalized * maxMove;
+
+                node.pos += move;
+                State.nodePositions[node.def.defName] = node.pos;
             }
 
             physicsTemperature *= 0.98f;
         }
+
+        private float velocitySum = 0f;
 
         public override void DoWindowContents(Rect inRect)
         {
@@ -273,9 +300,7 @@ namespace BetterResearchMenu
             var labelXOffset = 100f;
             var labelYOffset = 45f;
 
-            var targetBgColor = currentTab == DefsOf.Anomaly ? new ColorInt(45, 25, 25).ToColor :
-                                currentTab == DefsOf.VGE_Gravtech ? new ColorInt(25, 45, 45).ToColor :
-                                ColorGraphBackground;
+            var targetBgColor = currentTab == DefsOf.Anomaly ? ColorAnomalyBackground : currentTab == DefsOf.VGE_Gravtech ? ColorVGEBackground : ColorGraphBackground;
             currentBgColor = Color.Lerp(currentBgColor, targetBgColor, Time.deltaTime * 5f);
             Widgets.DrawBoxSolid(inRect, currentBgColor);
 
@@ -315,7 +340,6 @@ namespace BetterResearchMenu
                                 {
                                     node.state = NodeState.Expanded;
                                     State.nodeStates[node.def.defName] = node.state;
-                                    physicsTemperature = Mathf.Max(physicsTemperature, 20f); // Wake up graph to make room
                                 }
                                 nodeClicked = true;
                                 Event.current.Use();
@@ -358,6 +382,7 @@ namespace BetterResearchMenu
                     var dragPivot = new Vector2(graphRect.width / 2f, graphRect.height / 2f);
                     node.pos = ((localMousePos - dragPivot) / zoom) - cameraOffset;
                     node.velocity = Vector2.zero;
+                    node.dampVelocity = Vector2.zero;
                     State.nodePositions[node.def.defName] = node.pos;
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
                 }
@@ -489,12 +514,13 @@ namespace BetterResearchMenu
             float iconMargin = 10f;
             float textOffset = 60f;
 
+            var erasWithProjects = AllTechLevels.Where(tl => DefDatabase<ResearchProjectDef>.AllDefs.Any(x => (x.techLevel == tl || x.techLevel == TechLevel.Undefined && tl == Faction.OfPlayer.def.techLevel) && x.tab == currentTab)).ToList();
             var topRect = new Rect(0f, 0f, inRect.width, TopBarHeight);
             Widgets.DrawBoxSolid(topRect, ColorBoxBackground);
-            var segWidth = inRect.width / AllTechLevels.Count;
-            for (int i = 0; i < AllTechLevels.Count; i++)
+            var segWidth = inRect.width / erasWithProjects.Count;
+            for (int i = 0; i < erasWithProjects.Count; i++)
             {
-                var techLevel = AllTechLevels[i];
+                var techLevel = erasWithProjects[i];
                 var segRect = new Rect(i * segWidth, 0f, segWidth, TopBarHeight);
                 if (techLevel == currentEra)
                 {
@@ -615,7 +641,6 @@ namespace BetterResearchMenu
                 selectedNode.state = NodeState.Minimized;
                 State.nodeStates[selectedNode.def.defName] = NodeState.Minimized;
                 selectedNode = null;
-                physicsTemperature = Mathf.Max(physicsTemperature, 20f);
             }
             Text.Anchor = TextAnchor.UpperLeft;
             Text.Font = GameFont.Small;
