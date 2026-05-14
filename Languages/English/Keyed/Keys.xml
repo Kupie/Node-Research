@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LanguageData>
+  <BRM_RestrictResearchTechLevel>Restrict research to current tech level</BRM_RestrictResearchTechLevel>
+  <BRM_RestrictViewingFutureTechLevels>Hide research from future tech levels</BRM_RestrictViewingFutureTechLevels>
+  <BRM_RestrictViewingFutureProjects>Hide future research projects</BRM_RestrictViewingFutureProjects>
+  <BRM_EnableTechAdvancement>Enable tech advancement system</BRM_EnableTechAdvancement>
+  <BRM_DisableVFETribalsAdvancement>Disable VFE Tribals tech advancement</BRM_DisableVFETribalsAdvancement>
+  <BRM_StandardStudy>Standard study</BRM_StandardStudy>
+  <BRM_DarkStudy>Dark study</BRM_DarkStudy>
+  <BRM_GravStudy>Grav study</BRM_GravStudy>
+  <BRM_AdvancedTo>Advanced to {0}!</BRM_AdvancedTo>
+  <BRM_ProjectsUnlocked>{0} projects unlocked</BRM_ProjectsUnlocked>
+  <BRM_ColonyIsNowTech>Colony is now {0}</BRM_ColonyIsNowTech>
+  <BRM_Unlocks>Unlocks:</BRM_Unlocks>
+  <BRM_Researching>Researching...</BRM_Researching>
+  <BRM_CurrentlyResearching>Currently researching: {0}</BRM_CurrentlyResearching>
+  <BRM_FoundationsComplete>{0}/{1} foundations complete</BRM_FoundationsComplete>
+</LanguageData>
