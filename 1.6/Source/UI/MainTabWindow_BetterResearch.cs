@@ -685,6 +685,9 @@ namespace BetterResearchMenu
                     {
                         if (Event.current.button == 0)
                         {
+                            selectedNode = hoveredNode;
+                            selectedProject = hoveredNode.def;
+
                             hoveredNode.isDragging = true;
                             wasDraggingNode = true;
                             dragStartMousePos = localMousePos;
