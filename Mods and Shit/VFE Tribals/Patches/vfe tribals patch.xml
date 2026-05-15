@@ -2,9 +2,9 @@
 <Patch>
 
   <Operation Class="PatchOperationAddModExtension">
-    <xpath>/Defs/ResearchProjectDef[defName="VFET_Fire" or defName="VFET_Culture"]</xpath>
+    <xpath>Defs/VFETribals.TribalResearchProjectDef[defName="VFET_Fire" or defName="VFET_Culture"]</xpath>
     <value>
-      <li Class="BetterResearchMenu.ResearchFoundationExtension" />
+      <li Class="BetterResearchMenu.ResearchFoundationExtension"></li>
     </value>
   </Operation>
 
