@@ -1,3 +1,4 @@
+using RimWorld;
 using Verse;
 
 namespace BetterResearchMenu
@@ -10,6 +11,11 @@ namespace BetterResearchMenu
 
     public class ResearchFoundationExtension : DefModExtension
     {
+    }
+
+    public class EmergenceExtension : DefModExtension
+    {
+        public TechLevel targetLevel;
     }
 
     public static class Extensions

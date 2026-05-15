@@ -7,6 +7,15 @@
   <BRM_DisableVFETribalsAdvancement>Disable VFE Tribals tech advancement</BRM_DisableVFETribalsAdvancement>
   <BRM_StartCollapsed>All research nodes unlocked via scenario start collapsed</BRM_StartCollapsed>
   <BRM_NeverCollapseFoundations>Never auto-collapse foundation nodes</BRM_NeverCollapseFoundations>
+  <BRM_CollapseOnCompletion>Collapse node on research completion</BRM_CollapseOnCompletion>
+  <BRM_MaxExpandedNodes>Max expanded nodes ({0})</BRM_MaxExpandedNodes>
+  <BRM_Infinite>Infinite</BRM_Infinite>
+  <BRM_AutoOpenMenuOnFinish>Auto-open menu on project completion</BRM_AutoOpenMenuOnFinish>
+  <BRM_ForbidVanillaMenu>Forbid access to vanilla research menu</BRM_ForbidVanillaMenu>
+  <BRM_AdvancementTiedTo>Advancement tied to: {0}</BRM_AdvancementTiedTo>
+  <BRM_Foundations>Foundations</BRM_Foundations>
+  <BRM_EraCompletion>Era completion</BRM_EraCompletion>
+  <BRM_EraCompletionPercentage>Percentage of era research required: {0}</BRM_EraCompletionPercentage>
   <BRM_StandardStudy>Standard study</BRM_StandardStudy>
   <BRM_DarkStudy>Dark study</BRM_DarkStudy>
   <BRM_GravStudy>Grav study</BRM_GravStudy>
@@ -15,6 +24,7 @@
   <BRM_ProjectsUnlocked>{0} projects unlocked</BRM_ProjectsUnlocked>
   <BRM_ColonyIsNowTech>Colony is now {0}</BRM_ColonyIsNowTech>
   <BRM_Unlocks>Unlocks:</BRM_Unlocks>
+  <BRM_Requirements>Requirements:</BRM_Requirements>
   <BRM_Researching>Researching...</BRM_Researching>
   <BRM_CurrentlyResearching>Currently researching: {0}</BRM_CurrentlyResearching>
   <BRM_FoundationsComplete>{0}/{1} foundations complete</BRM_FoundationsComplete>
@@ -26,4 +36,18 @@
   <BRM_CannotAccessEra>You cannot access these eras yet. Complete foundations and advance to reach these trees.</BRM_CannotAccessEra>
   <BRM_ActiveBasicResearch>Active basic research: {0}</BRM_ActiveBasicResearch>
   <BRM_ActiveAdvancedResearch>Active advanced research: {0}</BRM_ActiveAdvancedResearch>
+  <BRM_TogglePhysics>Toggle movement/physics</BRM_TogglePhysics>
+  <BRM_OpenVanillaMenu>Open vanilla research menu</BRM_OpenVanillaMenu>
+  <BRM_RevealAllInGodMode>Reveal all nodes in God Mode</BRM_RevealAllInGodMode>
+  <BRM_EnableEmergence>Enable 'Emergence' advancing nodes</BRM_EnableEmergence>
+  <BRM_EmergenceCostNeolithic>Emergence cost (Neolithic): {0}</BRM_EmergenceCostNeolithic>
+  <BRM_EmergenceCostMedieval>Emergence cost (Medieval): {0}</BRM_EmergenceCostMedieval>
+  <BRM_EmergenceCostIndustrial>Emergence cost (Industrial): {0}</BRM_EmergenceCostIndustrial>
+  <BRM_EmergenceCostSpacer>Emergence cost (Spacer): {0}</BRM_EmergenceCostSpacer>
+  <BRM_EmergenceCostUltra>Emergence cost (Ultra): {0}</BRM_EmergenceCostUltra>
+  <BRM_EmergenceCostArchotech>Emergence cost (Archotech): {0}</BRM_EmergenceCostArchotech>
+  <BRM_Emergence>EMERGENCE</BRM_Emergence>
+  <BRM_EmergenceDesc>Advance to {0}.</BRM_EmergenceDesc>
+  <BRM_RequiresAllFoundations>Requires all foundations to be completed.</BRM_RequiresAllFoundations>
+  <BRM_RequiresEraCompletion>Requires {0} of era projects to be completed.</BRM_RequiresEraCompletion>
 </LanguageData>
