@@ -6,6 +6,7 @@
   <BRM_EnableTechAdvancement>Enable tech advancement system</BRM_EnableTechAdvancement>
   <BRM_DisableVFETribalsAdvancement>Disable VFE Tribals tech advancement</BRM_DisableVFETribalsAdvancement>
   <BRM_StartCollapsed>All research nodes unlocked via scenario start collapsed</BRM_StartCollapsed>
+  <BRM_NeverCollapseFoundations>Never auto-collapse foundation nodes</BRM_NeverCollapseFoundations>
   <BRM_StandardStudy>Standard study</BRM_StandardStudy>
   <BRM_DarkStudy>Dark study</BRM_DarkStudy>
   <BRM_GravStudy>Grav study</BRM_GravStudy>

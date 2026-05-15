@@ -11,4 +11,17 @@ namespace BetterResearchMenu
     public class ResearchFoundationExtension : DefModExtension
     {
     }
+
+    public static class Extensions
+    {
+        public static bool IsFoundation(this ResearchNode node)
+        {
+            return !node.isPhantom && node.def.IsFoundation();
+        }
+
+        public static bool IsFoundation(this ResearchProjectDef def)
+        {
+            return def.HasModExtension<ResearchFoundationExtension>();
+        }
+    }
 }

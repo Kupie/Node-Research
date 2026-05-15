@@ -12,6 +12,7 @@ namespace BetterResearchMenu
         private float scrollPositionX = 0f;
         private List<TechLevel> levels;
         private int targetIndex;
+        private float startTime;
 
         public Window_TechAdvance(TechLevel level)
         {
@@ -23,6 +24,7 @@ namespace BetterResearchMenu
             forcePause = true;
             closeOnClickedOutside = false;
             doWindowBackground = false;
+            startTime = Time.realtimeSinceStartup;
         }
 
         public override Vector2 InitialSize => new Vector2(UI.screenWidth, UI.screenHeight);
@@ -30,18 +32,22 @@ namespace BetterResearchMenu
         public override float Margin => 0f;
         public override void DoWindowContents(Rect inRect)
         {
-            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            float elapsed = Time.realtimeSinceStartup - startTime;
+            var alpha = Mathf.Clamp01(elapsed / 2f);
+            float bgAlpha = alpha * 0.85f;
+
+            GUI.color = new Color(0f, 0f, 0f, bgAlpha);
             GUI.DrawTexture(inRect, BaseContent.WhiteTex);
-            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            GUI.color = new Color(0f, 0f, 0f, bgAlpha);
             Widgets.DrawBox(inRect);
-            GUI.color = Color.white;
+            GUI.color = new Color(1f, 1f, 1f, alpha);
 
             Text.Font = GameFont.Medium;
             Text.Anchor = TextAnchor.MiddleCenter;
             Widgets.Label(new Rect(0, inRect.height / 2f - 220f, inRect.width, 60f), "BRM_AdvancedTo".Translate(newLevel.ToStringHuman().CapitalizeFirst()));
             Text.Font = GameFont.Small;
 
-            scrollPositionX = Mathf.Lerp(scrollPositionX, targetIndex * 200f, Time.deltaTime * 5f);
+            scrollPositionX = Mathf.Lerp(scrollPositionX, targetIndex * 200f, Time.deltaTime * 2f);
             float centerX = inRect.width / 2f;
             float centerY = inRect.height / 2f - 50f;
 
@@ -50,14 +56,14 @@ namespace BetterResearchMenu
                 float xPos = centerX + (i * 200f) - scrollPositionX - 100f;
                 var distance = Mathf.Abs(centerX - (xPos + 100f));
                 var scale = Mathf.Clamp(1f - (distance / 500f), 0.5f, 1f);
-                var alpha = Mathf.Clamp(1f - (distance / 600f), 0.2f, 1f);
+                var iconAlpha = Mathf.Clamp(1f - (distance / 600f), 0.2f, 1f) * alpha;
 
                 if (MainTabWindow_BetterResearch.TechLevelIcons.TryGetValue(levels[i], out var icon))
                 {
                     var size = 250f * scale;
-                    GUI.color = new Color(1f, 1f, 1f, alpha);
+                    GUI.color = new Color(1f, 1f, 1f, iconAlpha);
                     GUI.DrawTexture(new Rect(xPos + (200f - size) / 2f, centerY - size / 2f, size, size), icon);
-                    GUI.color = Color.white;
+                    GUI.color = new Color(1f, 1f, 1f, alpha);
                 }
             }
 
@@ -72,6 +78,7 @@ namespace BetterResearchMenu
             {
                 Close();
             }
+            GUI.color = Color.white;
         }
     }
 }

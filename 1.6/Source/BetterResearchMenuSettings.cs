@@ -10,6 +10,7 @@ namespace BetterResearchMenu
         public bool enableTechAdvancement = true;
         public bool disableVFETribalsAdvancement = true;
         public bool startCollapsed = true;
+        public bool neverCollapseFoundations = true;
         public float spacingForceMultiplier = 1f;
         public float contractingForceMultiplier = 1f;
         public float centerForceMultiplier = 1f;
@@ -23,6 +24,7 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref enableTechAdvancement, "enableTechAdvancement", true);
             Scribe_Values.Look(ref disableVFETribalsAdvancement, "disableVFETribalsAdvancement", true);
             Scribe_Values.Look(ref startCollapsed, "startCollapsed", true);
+            Scribe_Values.Look(ref neverCollapseFoundations, "neverCollapseFoundations", true);
             Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1f);
             Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1f);
             Scribe_Values.Look(ref centerForceMultiplier, "centerForceMultiplier", 1f);
