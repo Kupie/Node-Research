@@ -17,6 +17,7 @@ namespace BetterResearchMenu
 
         public static SoundDef BRM_ExpandingNode;
         public static SoundDef BRM_CollapsingNode;
+        public static SoundDef BRM_Advancement;
 
         static DefsOf() => DefOfHelper.EnsureInitializedInCtor(typeof(DefsOf));
     }

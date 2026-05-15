@@ -374,7 +374,6 @@ namespace BetterResearchMenu
                     continue;
                 }
 
-
                 var force = Vector2.zero;
                 bool nodeIsFoundation = node.def.HasModExtension<ResearchFoundationExtension>();
 
@@ -859,25 +858,28 @@ namespace BetterResearchMenu
                 }
 
                 Text.Font = GameFont.Small;
-                if (total == 0)
+                if (progress < 1f)
                 {
-                    Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(0, 0));
-                }
-                else
-                {
-                    Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
+                    if (total == 0)
+                    {
+                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(0, 0));
+                    }
+                    else
+                    {
+                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
+                    }
                 }
 
                 if (progress >= 1f && playerEra < TechLevel.Archotech)
                 {
-                    var advanceBtnRect = new Rect(leftRect.xMax + 8f, leftRect.y, 200f, 40f);
+                    var advanceBtnRect = new Rect(leftRect.xMax + 15f, leftRect.y + 15f, 200f, 40f);
                     if (Widgets.ButtonText(advanceBtnRect, "BRM_AdvanceTo".Translate(nextEra.ToStringHuman().CapitalizeFirst())))
                     {
                         Faction.OfPlayer.def.techLevel = nextEra;
                         Find.WindowStack.Add(new Window_TechAdvance(nextEra));
                         currentEra = nextEra;
                         InitPhysics(true);
-                        SoundDefOf.TabOpen.PlayOneShotOnCamera();
+                        DefsOf.BRM_Advancement.PlayOneShotOnCamera();
                     }
                 }
             }
