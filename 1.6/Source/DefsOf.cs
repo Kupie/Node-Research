@@ -12,6 +12,8 @@ namespace BetterResearchMenu
 
         [MayRequire("vanillaexpanded.gravship")]
         public static ResearchTabDef VGE_Gravtech;
+        [MayRequire("vanillaexpanded.gravship")]
+        public static ResearchProjectDef BasicGravtech;
 
         public static SoundDef BRM_ExpandingNode;
         public static SoundDef BRM_CollapsingNode;
