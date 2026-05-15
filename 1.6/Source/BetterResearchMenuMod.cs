@@ -21,6 +21,7 @@ namespace BetterResearchMenu
             ls.CheckboxLabeled("BRM_RestrictViewingFutureTechLevels".Translate(), ref settings.restrictViewingFutureTechLevels);
             ls.CheckboxLabeled("BRM_RestrictViewingFutureProjects".Translate(), ref settings.restrictViewingFutureProjects);
             ls.CheckboxLabeled("BRM_EnableTechAdvancement".Translate(), ref settings.enableTechAdvancement);
+            ls.CheckboxLabeled("BRM_StartCollapsed".Translate(), ref settings.startCollapsed);
             if (ModsConfig.IsActive("OskarPotocki.VFE.Tribals"))
             {
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);

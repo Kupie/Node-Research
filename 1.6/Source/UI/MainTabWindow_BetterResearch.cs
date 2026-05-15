@@ -21,7 +21,6 @@ namespace BetterResearchMenu
         public NodeState state;
         public bool isDragging;
         public int edgeCount;
-        public float lockTicks;
         public float RadiusMultiplier => def.HasModExtension<ResearchFoundationExtension>() ? 1.5f : 1.0f;
     }
 
@@ -127,7 +126,8 @@ namespace BetterResearchMenu
         public override Vector2 InitialSize => new Vector2(UI.screenWidth, base.InitialSize.y * 1.3f);
         private bool LeftBarVisible =>
             currentTab == DefsOf.Main &&
-            BetterResearchMenuMod.settings.enableTechAdvancement;
+            BetterResearchMenuMod.settings.enableTechAdvancement &&
+            currentEra == Faction.OfPlayer.def.techLevel;
 
         private string GetCacheKey(ResearchProjectDef def) => $"{def.defName}_{currentEra}";
 
@@ -259,6 +259,19 @@ namespace BetterResearchMenu
                     else cameraOffset = Vector2.zero;
                     cachedCameraOffsets[key] = cameraOffset;
                 }
+
+                if (nodes.Any())
+                {
+                    Vector2 min = new Vector2(nodes.Min(n => n.pos.x), nodes.Min(n => n.pos.y));
+                    Vector2 max = new Vector2(nodes.Max(n => n.pos.x), nodes.Max(n => n.pos.y));
+                    Rect bounds = new Rect(min.x, min.y, max.x - min.x, max.y - min.y).ExpandedBy(1000f);
+                    if (!bounds.Contains(-cameraOffset))
+                    {
+                        var centerNode = nodes.FirstOrDefault(n => n.def.HasModExtension<ResearchFoundationExtension>()) ?? nodes.FirstOrDefault();
+                        cameraOffset = centerNode != null ? -centerNode.pos : Vector2.zero;
+                        cachedCameraOffsets[key] = cameraOffset;
+                    }
+                }
             }
         }
 
@@ -273,7 +286,7 @@ namespace BetterResearchMenu
             if (State.nodeStates.TryGetValue(def.defName, out var state))
                 return state;
 
-            if (def.IsFinished) return NodeState.Expanded;
+            if (def.IsFinished) return BetterResearchMenuMod.settings.startCollapsed ? NodeState.Minimized : NodeState.Expanded;
             bool isOrphan = def.prerequisites.NullOrEmpty() && def.hiddenPrerequisites.NullOrEmpty();
             if (isOrphan && !def.IsFinished) return NodeState.Minimized;
             if (def.PrerequisitesCompleted) return NodeState.Dot;
@@ -331,11 +344,11 @@ namespace BetterResearchMenu
                 }
                 else
                 {
-                    node.drawPos = Vector2.SmoothDamp(node.drawPos, node.pos, ref node.dampVelocity, 0.02f);
+                    node.drawPos = Vector2.SmoothDamp(node.drawPos, node.pos, ref node.dampVelocity, 0.05f);
                 }
             }
 
-            if (physicsTemperature <= 0.1f)
+            if (physicsTemperature <= 0.5f)
             {
                 foreach (var node in nodes)
                     node.drawPos = node.pos;
@@ -344,12 +357,12 @@ namespace BetterResearchMenu
 
         private void PhysicsTick(float dt)
         {
-            if (physicsTemperature < 0.1f) { physicsTemperature = 0f; velocitySum = 0f; return; }
+            if (physicsTemperature < 0.5f) { physicsTemperature = 0f; velocitySum = 0f; return; }
 
-            var k = 300f;
+            var k = 500f;
             var minDistance = 15f;
             var maxRepulsionDistance = 500f;
-            var dampingFactor = 0.6f;
+            var dampingFactor = 0.5f;
             var clingMultiplier = 20f;
 
             velocitySum = 0f;
@@ -361,13 +374,6 @@ namespace BetterResearchMenu
                     continue;
                 }
 
-                if (node.lockTicks > 0f)
-                {
-                    node.lockTicks -= 1f;
-                    node.velocity *= 0.1f;
-                    velocitySum += node.velocity.sqrMagnitude;
-                    continue;
-                }
 
                 var force = Vector2.zero;
                 bool nodeIsFoundation = node.def.HasModExtension<ResearchFoundationExtension>();
@@ -420,19 +426,20 @@ namespace BetterResearchMenu
                 {
                     connectedCenter /= connCount;
                     Vector2 offset = connectedCenter - node.pos;
-                    if (offset.magnitude > 400f)
-                        force += offset * 0.8f;
+                    if (offset.magnitude > 300f)
+                        force += offset * 2.0f;
                 }
 
-                float centerForce = 0.02f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                if (node.edgeCount == 0) centerForce *= 20f;
+                float centerForce = 0.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
+                if (node.edgeCount == 0) centerForce *= 10f;
                 force -= node.pos * centerForce;
 
-                node.velocity = (node.velocity + force * dt) * dampingFactor;
+                float mass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
+                node.velocity = (node.velocity + (force / mass) * dt) * dampingFactor;
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
-            if (velocitySum < 0.5f) { physicsTemperature = 0f; return; }
+            if (nodes.Count > 0 && velocitySum / nodes.Count < 0.01f) { physicsTemperature = 0f; return; }
 
             foreach (var node in nodes)
             {
@@ -543,9 +550,9 @@ namespace BetterResearchMenu
             if (Event.current.rawType == EventType.MouseUp)
             {
                 isPanning = false;
-                if (Event.current.button == 0 && wasDraggingNode)
+                if (wasDraggingNode)
                 {
-                    if (selectedNode != null && Vector2.Distance(localMousePos, dragStartMousePos) < 5f)
+                    if (Event.current.button == 0 && selectedNode != null && Vector2.Distance(localMousePos, dragStartMousePos) < 5f)
                     {
                         if (selectedNode.state == NodeState.Minimized || selectedNode.state == NodeState.Dot)
                         {
@@ -560,10 +567,6 @@ namespace BetterResearchMenu
                                 physicsTemperature = Mathf.Max(physicsTemperature, 20f);
                                 DefsOf.BRM_ExpandingNode.PlayOneShotOnCamera();
 
-                                foreach (var edge in edges)
-                                {
-                                    if (edge.to == selectedNode) edge.from.lockTicks = 60f;
-                                }
                             }
                         }
                         else if (selectedNode.state == NodeState.Expanded)
@@ -579,12 +582,12 @@ namespace BetterResearchMenu
                             }
                         }
                     }
+                    physicsTemperature = Mathf.Max(physicsTemperature, 100f);
                 }
+
                 wasDraggingNode = false;
                 foreach (var node in nodes)
                     node.isDragging = false;
-
-                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
 
             foreach (var node in nodes)
@@ -639,6 +642,7 @@ namespace BetterResearchMenu
                     var drawState = (node.state == NodeState.Minimized || isHovering) ? NodeState.Minimized : NodeState.Dot;
 
                     var size = (drawState == NodeState.Minimized ? NodeSizeMinimized : NodeSizeDot) * zoom;
+                    if (isFoundation && drawState == NodeState.Minimized) size *= 1.5f;
                     var buttonRect = new Rect(screenPos.x - size / 2f, screenPos.y - size / 2f, size, size);
 
                     if (node.def.IsFinished)
@@ -829,7 +833,8 @@ namespace BetterResearchMenu
                 float labelWidth = 200f;
                 float labelHeight = 50f;
 
-                var foundations = DefDatabase<ResearchProjectDef>.AllDefs.Where(x => x.techLevel == currentEra && x.tab == currentTab && x.HasModExtension<ResearchFoundationExtension>()).ToList();
+                var playerEra = Faction.OfPlayer.def.techLevel;
+                var foundations = DefDatabase<ResearchProjectDef>.AllDefs.Where(x => x.techLevel == playerEra && x.tab == currentTab && x.HasModExtension<ResearchFoundationExtension>()).ToList();
                 var total = foundations.Count;
                 var leftRect = new Rect(0f, TopBarHeight, leftBarWidth, inRect.height - TopBarHeight - BottomBarHeight);
                 Widgets.DrawBoxSolid(leftRect, ColorLeftBarBackground);
@@ -840,14 +845,14 @@ namespace BetterResearchMenu
                 var fillHeight = leftRect.height * progress;
                 GUI.DrawTexture(new Rect(leftRect.x, leftRect.yMax - fillHeight, leftRect.width, fillHeight), TexBarFill);
 
-                var nextEra = (TechLevel)((int)currentEra + 1);
+                var nextEra = (TechLevel)((int)playerEra + 1);
                 if (TechLevelIcons.TryGetValue(nextEra, out var nextIcon))
                 {
                     var nextIconRect = new Rect(leftRect.center.x - iconSize / 2f, leftRect.y + iconMargin, iconSize, iconSize);
                     GUI.DrawTexture(nextIconRect, nextIcon);
                 }
 
-                if (TechLevelIcons.TryGetValue(currentEra, out var currentIcon))
+                if (TechLevelIcons.TryGetValue(playerEra, out var currentIcon))
                 {
                     var currentIconRect = new Rect(leftRect.center.x - iconSize / 2f, leftRect.yMax - iconSize - iconMargin, iconSize, iconSize);
                     GUI.DrawTexture(currentIconRect, currentIcon);
@@ -863,9 +868,9 @@ namespace BetterResearchMenu
                     Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
                 }
 
-                if (progress >= 1f && currentEra < TechLevel.Archotech)
+                if (progress >= 1f && playerEra < TechLevel.Archotech)
                 {
-                    var advanceBtnRect = new Rect(leftRect.xMax, leftRect.y, 200f, 40f);
+                    var advanceBtnRect = new Rect(leftRect.xMax + 8f, leftRect.y, 200f, 40f);
                     if (Widgets.ButtonText(advanceBtnRect, "BRM_AdvanceTo".Translate(nextEra.ToStringHuman().CapitalizeFirst())))
                     {
                         Faction.OfPlayer.def.techLevel = nextEra;
