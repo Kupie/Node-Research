@@ -22,4 +22,6 @@
   <BRM_Points>{0} points</BRM_Points>
   <BRM_AllEras>All</BRM_AllEras>
   <BRM_CannotAccessEra>You cannot access these eras yet. Complete foundations and advance to reach these trees.</BRM_CannotAccessEra>
+  <BRM_ActiveBasicResearch>Active basic research: {0}</BRM_ActiveBasicResearch>
+  <BRM_ActiveAdvancedResearch>Active advanced research: {0}</BRM_ActiveAdvancedResearch>
 </LanguageData>

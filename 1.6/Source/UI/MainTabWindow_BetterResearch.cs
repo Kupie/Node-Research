@@ -21,6 +21,7 @@ namespace BetterResearchMenu
         public NodeState state;
         public bool isDragging;
         public int edgeCount;
+        public float lockTicks;
         public float RadiusMultiplier => def.HasModExtension<ResearchFoundationExtension>() ? 1.5f : 1.0f;
     }
 
@@ -80,9 +81,9 @@ namespace BetterResearchMenu
 
         public static List<TechLevel> AllTechLevels = Enum.GetValues(typeof(TechLevel)).Cast<TechLevel>().Where(tl => tl != TechLevel.Undefined).ToList();
         private float TopBarHeight => currentTab == DefsOf.Main ? 45f : 0f;
-        private float BottomBarHeight => Find.ResearchManager.currentProj != null ? 80f : 40f;
         private float RightPanelWidth => 300f;
         private float NodeSizeExpanded => 80f;
+        private float BottomBarHeight => GetActiveProjectsForTab(currentTab).Count > 0 ? 80f : 40f;
         private float NodeSizeMinimized => 40f;
         private float NodeSizeDot => 20f;
         private static Color ColorBoxBackground => new ColorInt(38, 36, 36).ToColor;
@@ -95,7 +96,7 @@ namespace BetterResearchMenu
         private static Color ColorNodeMinimized => new ColorInt(95, 99, 102).ToColor;
         private static Color ColorBubbleProgress => new ColorInt(125, 183, 96).ToColor;
         private static Color ColorTechLevelTab => new ColorInt(29, 34, 38).ToColor;
-        private static Color ColorTechLevelTabSelected => new ColorInt(38, 43, 47).ToColor;
+        private static Color ColorTechLevelTabSelected => new ColorInt(89, 94, 98).ToColor;
         private static Color ColorLeftBarBackground => new ColorInt(73, 78, 96).ToColor;
         private static Color ColorResearchingButton => new ColorInt(159, 125, 76).ToColor;
         private float ThicknessFinished => 3f;
@@ -126,8 +127,32 @@ namespace BetterResearchMenu
         public override Vector2 InitialSize => new Vector2(UI.screenWidth, base.InitialSize.y * 1.3f);
         private bool LeftBarVisible =>
             currentTab == DefsOf.Main &&
-            BetterResearchMenuMod.settings.enableTechAdvancement &&
-            DefDatabase<ResearchProjectDef>.AllDefs.Any(x => x.techLevel == currentEra && x.tab == currentTab && x.HasModExtension<ResearchFoundationExtension>());
+            BetterResearchMenuMod.settings.enableTechAdvancement;
+
+        private string GetCacheKey(ResearchProjectDef def) => $"{def.defName}_{currentEra}";
+
+        private List<ResearchProjectDef> GetActiveProjectsForTab(ResearchTabDef tab)
+        {
+            var list = new List<ResearchProjectDef>();
+            if (tab == DefsOf.Anomaly)
+            {
+                if (Find.ResearchManager.CurrentAnomalyKnowledgeProjects != null)
+                    foreach (var item in Find.ResearchManager.CurrentAnomalyKnowledgeProjects)
+                        if (item.project != null) list.Add(item.project);
+            }
+            else if (tab == DefsOf.VGE_Gravtech)
+            {
+                var p = (ResearchProjectDef)currentGravtechProjectField?.GetValue(null);
+                if (p != null) list.Add(p);
+            }
+            else
+            {
+                if (Find.ResearchManager.currentProj != null && Find.ResearchManager.currentProj.tab == tab)
+                    list.Add(Find.ResearchManager.currentProj);
+            }
+            return list;
+        }
+
         public override void PreOpen()
         {
             base.PreOpen();
@@ -158,7 +183,7 @@ namespace BetterResearchMenu
                 var node = new ResearchNode { def = def };
                 node.state = GetNodeState(def);
 
-                if (State.nodePositions.TryGetValue(def.defName, out var savedPos))
+                if (State.nodePositions.TryGetValue(GetCacheKey(def), out var savedPos))
                 {
                     node.pos = savedPos;
                 }
@@ -170,7 +195,7 @@ namespace BetterResearchMenu
                     {
                         foreach (var prereq in def.prerequisites)
                         {
-                            if (State.nodePositions.TryGetValue(prereq.defName, out var pPos))
+                            if (State.nodePositions.TryGetValue(GetCacheKey(prereq), out var pPos))
                             {
                                 avgPos += pPos;
                                 count++;
@@ -180,7 +205,7 @@ namespace BetterResearchMenu
                     if (count > 0) avgPos /= count;
                     else avgPos = new Vector2(((int)def.techLevel - (int)currentEra) * techLevelSpacing, 0f);
                     node.pos = avgPos + new Vector2(Rand.Range(-randomOffset, randomOffset), Rand.Range(-randomOffset, randomOffset));
-                    State.nodePositions[def.defName] = node.pos;
+                    State.nodePositions[GetCacheKey(def)] = node.pos;
                 }
                 node.drawPos = node.pos;
 
@@ -290,6 +315,11 @@ namespace BetterResearchMenu
 
             currentBgColor = Color.Lerp(currentBgColor, currentTab == DefsOf.Anomaly ? ColorAnomalyBackground : currentTab == DefsOf.VGE_Gravtech ? ColorVGEBackground : ColorGraphBackground, Time.deltaTime * 5f);
 
+            if (wasDraggingNode)
+            {
+                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
+            }
+
             PhysicsTick(0.02f);
 
             foreach (var node in nodes)
@@ -301,7 +331,7 @@ namespace BetterResearchMenu
                 }
                 else
                 {
-                    node.drawPos = Vector2.SmoothDamp(node.drawPos, node.pos, ref node.dampVelocity, 0.05f);
+                    node.drawPos = Vector2.SmoothDamp(node.drawPos, node.pos, ref node.dampVelocity, 0.02f);
                 }
             }
 
@@ -316,10 +346,10 @@ namespace BetterResearchMenu
         {
             if (physicsTemperature < 0.1f) { physicsTemperature = 0f; velocitySum = 0f; return; }
 
-            var k = 180f;
+            var k = 300f;
             var minDistance = 15f;
             var maxRepulsionDistance = 500f;
-            var dampingFactor = 0.9f;
+            var dampingFactor = 0.6f;
             var clingMultiplier = 20f;
 
             velocitySum = 0f;
@@ -331,7 +361,16 @@ namespace BetterResearchMenu
                     continue;
                 }
 
+                if (node.lockTicks > 0f)
+                {
+                    node.lockTicks -= 1f;
+                    node.velocity *= 0.1f;
+                    velocitySum += node.velocity.sqrMagnitude;
+                    continue;
+                }
+
                 var force = Vector2.zero;
+                bool nodeIsFoundation = node.def.HasModExtension<ResearchFoundationExtension>();
 
                 foreach (var other in nodes)
                 {
@@ -342,8 +381,11 @@ namespace BetterResearchMenu
 
                     if (dist < maxRepulsionDistance)
                     {
+                        bool otherIsFoundation = other.def.HasModExtension<ResearchFoundationExtension>();
                         float effectiveK = k * ((node.RadiusMultiplier + other.RadiusMultiplier) * 0.5f);
-                        force += dir / dist * (effectiveK * effectiveK / dist) * BetterResearchMenuMod.settings.spacingForceMultiplier;
+                        float forceMag = (effectiveK * effectiveK / dist) * BetterResearchMenuMod.settings.spacingForceMultiplier;
+                        if (nodeIsFoundation && otherIsFoundation) forceMag *= 3f;
+                        force += dir / dist * forceMag;
                     }
                 }
 
@@ -367,6 +409,21 @@ namespace BetterResearchMenu
                     }
                 }
 
+                Vector2 connectedCenter = Vector2.zero;
+                int connCount = 0;
+                foreach (var edge in edges)
+                {
+                    if (edge.from == node) { connectedCenter += edge.to.pos; connCount++; }
+                    else if (edge.to == node) { connectedCenter += edge.from.pos; connCount++; }
+                }
+                if (connCount > 0)
+                {
+                    connectedCenter /= connCount;
+                    Vector2 offset = connectedCenter - node.pos;
+                    if (offset.magnitude > 400f)
+                        force += offset * 0.8f;
+                }
+
                 float centerForce = 0.02f * BetterResearchMenuMod.settings.centerForceMultiplier;
                 if (node.edgeCount == 0) centerForce *= 20f;
                 force -= node.pos * centerForce;
@@ -381,13 +438,13 @@ namespace BetterResearchMenu
             {
                 if (node.isDragging || node.state == NodeState.Hidden) continue;
 
-                var move = node.velocity * dt * 2.5f;
+                var move = node.velocity * dt * 8.0f;
 
                 float maxMove = physicsTemperature * 0.2f;
                 if (move.magnitude > maxMove) move = move.normalized * maxMove;
 
                 node.pos += move;
-                State.nodePositions[node.def.defName] = node.pos;
+                State.nodePositions[GetCacheKey(node.def)] = node.pos;
             }
 
             physicsTemperature *= 0.98f;
@@ -431,62 +488,55 @@ namespace BetterResearchMenu
 
             bool mouseInPanel = selectedNode != null && panelRect.Contains(Event.current.mousePosition);
 
-            if (!mouseInPanel && !interactionExclusion.Contains(localMousePos) && !searchBarRect.Contains(localMousePos) && Event.current.type == EventType.MouseDown && (Event.current.button == 0 || Event.current.button == 1 || Event.current.button == 2) && graphRect.Contains(mousePos))
+            if (!mouseInPanel && !interactionExclusion.Contains(localMousePos) && !searchBarRect.Contains(localMousePos) && graphRect.Contains(mousePos))
             {
-                bool nodeClicked = false;
-
-                if (Event.current.button == 0 || Event.current.button == 1)
+                ResearchNode hoveredNode = null;
+                for (var i = nodes.Count - 1; i >= 0; i--)
                 {
-                    for (var i = nodes.Count - 1; i >= 0; i--)
+                    var node = nodes[i];
+                    if (node.state == NodeState.Hidden) continue;
+                    var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
+                    var isFoundation = node.def.HasModExtension<ResearchFoundationExtension>();
+                    var nodeSize = (node.state == NodeState.Dot || node.state == NodeState.Minimized) ? NodeSizeMinimized : (isFoundation ? NodeSizeExpanded * 2f : NodeSizeExpanded);
+                    nodeSize *= zoom;
+                    if (Vector2.Distance(screenPos, localMousePos) < nodeSize / 2f)
                     {
-                        var node = nodes[i];
-                        if (node.state == NodeState.Hidden)
-                            continue;
-
-                        var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
-
-                        var isFoundation = node.def.HasModExtension<ResearchFoundationExtension>();
-                        var nodeSize = (node.state == NodeState.Dot || node.state == NodeState.Minimized) ? NodeSizeMinimized : (isFoundation ? NodeSizeExpanded * 2f : NodeSizeExpanded);
-                        nodeSize *= zoom;
-
-                        if (Vector2.Distance(screenPos, localMousePos) < nodeSize / 2f)
-                        {
-                            if (Event.current.button == 0)
-                            {
-                                if (!node.def.CanStartNow && !node.def.IsFinished)
-                                {
-                                    Messages.Message(GetLockedReason(node.def), MessageTypeDefOf.RejectInput, false);
-                                }
-                                else
-                                {
-                                    selectedNode = node;
-                                    node.isDragging = true;
-                                    wasDraggingNode = true;
-                                    dragStartMousePos = localMousePos;
-
-                                    var worldMousePos = ((localMousePos - pivot) / zoom) - cameraOffset;
-                                    dragOffset = node.pos - worldMousePos;
-                                }
-                            }
-                            else if (Event.current.button == 1)
-                            {
-                                node.state = NodeState.Minimized;
-                                State.nodeStates[node.def.defName] = node.state;
-                                if (selectedNode == node) selectedNode = null;
-                                physicsTemperature = Mathf.Max(physicsTemperature, 20f);
-                                DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
-                            }
-                            nodeClicked = true;
-                            Event.current.Use();
-                            break;
-                        }
+                        hoveredNode = node;
+                        break;
                     }
                 }
 
-                if (!nodeClicked && Event.current.button != 1)
+                if (hoveredNode != null && !isPanning && !wasDraggingNode)
                 {
-                    isPanning = true;
-                    Event.current.Use();
+                    selectedNode = hoveredNode;
+                }
+
+                if (Event.current.type == EventType.MouseDown && (Event.current.button == 0 || Event.current.button == 1 || Event.current.button == 2))
+                {
+                    if (hoveredNode != null)
+                    {
+                        if (Event.current.button == 0)
+                        {
+                            hoveredNode.isDragging = true;
+                            wasDraggingNode = true;
+                            dragStartMousePos = localMousePos;
+                            var worldMousePos = ((localMousePos - pivot) / zoom) - cameraOffset;
+                            dragOffset = hoveredNode.pos - worldMousePos;
+                        }
+                        else if (Event.current.button == 1)
+                        {
+                            hoveredNode.state = NodeState.Minimized;
+                            State.nodeStates[hoveredNode.def.defName] = hoveredNode.state;
+                            physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+                            DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
+                        }
+                        Event.current.Use();
+                    }
+                    else if (Event.current.button != 1)
+                    {
+                        isPanning = true;
+                        Event.current.Use();
+                    }
                 }
             }
 
@@ -509,6 +559,23 @@ namespace BetterResearchMenu
                                 State.nodeStates[selectedNode.def.defName] = selectedNode.state;
                                 physicsTemperature = Mathf.Max(physicsTemperature, 20f);
                                 DefsOf.BRM_ExpandingNode.PlayOneShotOnCamera();
+
+                                foreach (var edge in edges)
+                                {
+                                    if (edge.to == selectedNode) edge.from.lockTicks = 60f;
+                                }
+                            }
+                        }
+                        else if (selectedNode.state == NodeState.Expanded)
+                        {
+                            if (!selectedNode.def.CanStartNow && !selectedNode.def.IsFinished)
+                            {
+                                Messages.Message(GetLockedReason(selectedNode.def), MessageTypeDefOf.RejectInput, false);
+                            }
+                            else if (selectedNode.def.CanStartNow && !GetActiveProjectsForTab(currentTab).Contains(selectedNode.def))
+                            {
+                                SoundDefOf.ResearchStart.PlayOneShotOnCamera();
+                                Find.ResearchManager.SetCurrentProject(selectedNode.def);
                             }
                         }
                     }
@@ -516,6 +583,8 @@ namespace BetterResearchMenu
                 wasDraggingNode = false;
                 foreach (var node in nodes)
                     node.isDragging = false;
+
+                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
 
             foreach (var node in nodes)
@@ -525,7 +594,7 @@ namespace BetterResearchMenu
                     node.pos = ((localMousePos - pivot) / zoom) - cameraOffset + dragOffset;
                     node.velocity = Vector2.zero;
                     node.dampVelocity = Vector2.zero;
-                    State.nodePositions[node.def.defName] = node.pos;
+                    State.nodePositions[GetCacheKey(node.def)] = node.pos;
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
                 }
             }
@@ -539,6 +608,7 @@ namespace BetterResearchMenu
                 return (worldPos + cameraOffset) * zoom + pivot;
             }
 
+            var activeProjects = GetActiveProjectsForTab(currentTab);
             foreach (var edge in edges)
             {
                 if (edge.from.state == NodeState.Hidden || edge.to.state == NodeState.Hidden)
@@ -615,7 +685,7 @@ namespace BetterResearchMenu
                 }
                 var padding = isFoundation ? IconPadding * 2f : IconPadding;
                 bool isSilhouetted = !node.def.IsFinished;
-                DrawBubble(nodeRect, node.def, padding * zoom, drawSilhouette: isSilhouetted);
+                DrawBubble(nodeRect, node.def, padding * zoom, activeProjects, drawSilhouette: isSilhouetted);
 
                 if (zoom > 0.4f)
                 {
@@ -761,13 +831,10 @@ namespace BetterResearchMenu
 
                 var foundations = DefDatabase<ResearchProjectDef>.AllDefs.Where(x => x.techLevel == currentEra && x.tab == currentTab && x.HasModExtension<ResearchFoundationExtension>()).ToList();
                 var total = foundations.Count;
-                if (total == 0)
-                    return;
-
                 var leftRect = new Rect(0f, TopBarHeight, leftBarWidth, inRect.height - TopBarHeight - BottomBarHeight);
                 Widgets.DrawBoxSolid(leftRect, ColorLeftBarBackground);
                 var finished = foundations.Count(x => x.IsFinished);
-                var progress = total > 0 ? (float)finished / total : 0f;
+                var progress = total > 0 ? (float)finished / total : 1f;
 
                 GUI.DrawTexture(leftRect, TexBarBg);
                 var fillHeight = leftRect.height * progress;
@@ -787,7 +854,14 @@ namespace BetterResearchMenu
                 }
 
                 Text.Font = GameFont.Small;
-                Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
+                if (total == 0)
+                {
+                    Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(0, 0));
+                }
+                else
+                {
+                    Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
+                }
 
                 if (progress >= 1f && currentEra < TechLevel.Archotech)
                 {
@@ -846,7 +920,7 @@ namespace BetterResearchMenu
             var proj = selectedNode.def;
 
             var iconRect = new Rect(panelRect.x + iconMargin, panelRect.y + iconTopOffset, iconSize, iconSize);
-            DrawBubble(iconRect, proj, iconPadding);
+            DrawBubble(iconRect, proj, iconPadding, GetActiveProjectsForTab(currentTab));
             Text.Font = GameFont.Medium;
             Text.Anchor = TextAnchor.MiddleLeft;
             Widgets.Label(new Rect(iconRect.xMax + titleOffset, iconRect.y, panelRect.width - iconRect.width - titlePadding, iconRect.height), proj.LabelCap);
@@ -870,7 +944,7 @@ namespace BetterResearchMenu
             }
             Widgets.EndScrollView();
             var btnRect = new Rect(panelRect.x + iconMargin, panelRect.yMax - actionBtnBottomMargin, panelRect.width - titlePadding, actionBtnHeight);
-            if (proj == GetActiveProjectForTab(currentTab))
+            if (GetActiveProjectsForTab(currentTab).Contains(proj))
             {
                 Widgets.DrawBoxSolid(btnRect, ColorResearchingButton);
                 Text.Anchor = TextAnchor.MiddleCenter;
@@ -897,26 +971,6 @@ namespace BetterResearchMenu
             }
         }
 
-        private ResearchProjectDef GetActiveProjectForTab(ResearchTabDef tab)
-        {
-            if (tab == DefsOf.Anomaly)
-            {
-
-                if (Find.ResearchManager.CurrentAnomalyKnowledgeProjects != null)
-                {
-                    foreach (var item in Find.ResearchManager.CurrentAnomalyKnowledgeProjects)
-                    {
-                        if (item.project != null) return item.project;
-                    }
-                }
-            }
-            else if (tab == DefsOf.VGE_Gravtech)
-            {
-                return (ResearchProjectDef)currentGravtechProjectField?.GetValue(null);
-            }
-            return Find.ResearchManager.currentProj;
-        }
-
         private void DrawResearchTabs(Rect rect)
         {
             float tabWidth = 120f;
@@ -928,7 +982,7 @@ namespace BetterResearchMenu
             var hasGravtech = DefsOf.VGE_Gravtech != null && (DebugSettings.godMode || DefsOf.BasicGravtech.IsFinished);
             var tabCount = 1 + (hasAnomaly ? 1 : 0) + (hasGravtech ? 1 : 0);
             var tabsWidth = tabWidth * tabCount;
-            var tabsRect = new Rect(rect.xMax - tabsWidth - tabsMargin, rect.y + tabsYOffset, tabsWidth, tabHeight);
+            var tabsRect = new Rect(rect.xMax - tabsWidth - tabsMargin, rect.yMax - tabHeight - tabsYOffset, tabsWidth, tabHeight);
             var currX = tabsRect.x;
             if (Widgets.ButtonText(new Rect(currX, tabsRect.y, tabWidth, tabsRect.height), "BRM_StandardStudy".Translate())) SetType(DefsOf.Main);
             currX += tabWidth;
@@ -945,30 +999,51 @@ namespace BetterResearchMenu
 
         private void DrawBottomBar(Rect inRect)
         {
-            float iconMargin = 20f;
-            float iconYOffset = 10f;
+            float iconMargin = 10f;
             float iconSize = 60f;
             float iconPadding = 8f;
-            float labelWidth = 400f;
             float labelHeight = 30f;
-            float barYOffset = 40f;
-            float barWidthReduction = 120f;
             float barHeight = 24f;
 
             var bottomRect = new Rect(0f, inRect.height - BottomBarHeight, inRect.width, BottomBarHeight);
             Widgets.DrawBoxSolid(bottomRect, ColorBoxBackground);
 
-            var proj = GetActiveProjectForTab(currentTab);
-            if (proj != null)
+            var activeProjs = GetActiveProjectsForTab(currentTab);
+
+            bool hasAnomaly = DefsOf.Anomaly != null && (DebugSettings.godMode || Find.Anomaly.HighestLevelReached > 0);
+            bool hasGravtech = DefsOf.VGE_Gravtech != null && (DebugSettings.godMode || DefsOf.BasicGravtech.IsFinished);
+            int tabCount = 1 + (hasAnomaly ? 1 : 0) + (hasGravtech ? 1 : 0);
+            float tabsWidth = 120f * tabCount;
+            float availableWidth = bottomRect.width - tabsWidth - 20f;
+
+            for (int i = 0; i < activeProjs.Count; i++)
             {
-                var contentX = iconMargin;
-                var bubbleRect = new Rect(contentX, bottomRect.y + iconYOffset, iconSize, iconSize);
-                DrawBubble(bubbleRect, proj, iconPadding);
+                var proj = activeProjs[i];
+                float segWidth = availableWidth / activeProjs.Count;
+                float startX = i * segWidth;
+
+                var bubbleRect = new Rect(startX + iconMargin, bottomRect.y + 10f, iconSize, iconSize);
+                DrawBubble(bubbleRect, proj, iconPadding, activeProjs);
+
                 Text.Anchor = TextAnchor.MiddleLeft;
                 Text.Font = GameFont.Small;
-                Widgets.Label(new Rect(contentX + 80f, bottomRect.y + iconYOffset, labelWidth, labelHeight), "BRM_CurrentlyResearching".Translate(proj.LabelCap));
-                var progRect = new Rect(contentX + 80f, bottomRect.y + barYOffset, bottomRect.width - contentX - 80f - barWidthReduction, barHeight);
+
+                string labelText;
+                if (currentTab == DefsOf.Anomaly && proj.knowledgeCategory != null)
+                {
+                    string key = proj.knowledgeCategory == KnowledgeCategoryDefOf.Advanced ? "BRM_ActiveAdvancedResearch" : "BRM_ActiveBasicResearch";
+                    labelText = key.Translate(proj.LabelCap);
+                }
+                else
+                {
+                    labelText = "BRM_CurrentlyResearching".Translate(proj.LabelCap);
+                }
+
+                Widgets.Label(new Rect(startX + 80f, bottomRect.y + 10f, segWidth - 80f, labelHeight), labelText);
+
+                var progRect = new Rect(startX + 80f, bottomRect.y + 40f, segWidth - 100f, barHeight);
                 Widgets.FillableBar(progRect, proj.ProgressPercent, TexBarFill, TexBarBg, true);
+
                 Text.Anchor = TextAnchor.MiddleCenter;
                 Widgets.Label(progRect, $"{proj.ProgressApparent:F0} / {proj.CostApparent:F0}");
                 Text.Anchor = TextAnchor.UpperLeft;
@@ -995,7 +1070,7 @@ namespace BetterResearchMenu
             BetterResearchMenuMod.settings.centerForceMultiplier = Widgets.HorizontalSlider(gravityRect, BetterResearchMenuMod.settings.centerForceMultiplier, 0.1f, 5.0f, true);
 
             GUI.DrawTexture(new Rect(spacingRect.x - 24f, spacingRect.y + 1f, iconSize, iconSize), TexSpacing);
-            BetterResearchMenuMod.settings.spacingForceMultiplier = Widgets.HorizontalSlider(spacingRect, BetterResearchMenuMod.settings.spacingForceMultiplier, 0.1f, 5.0f, true);
+            BetterResearchMenuMod.settings.spacingForceMultiplier = Widgets.HorizontalSlider(spacingRect, BetterResearchMenuMod.settings.spacingForceMultiplier, 0.1f, 10.0f, true);
 
             GUI.DrawTexture(new Rect(contractingRect.x - 24f, contractingRect.y + 1f, iconSize, iconSize), TexContracting);
             BetterResearchMenuMod.settings.contractingForceMultiplier = Widgets.HorizontalSlider(contractingRect, BetterResearchMenuMod.settings.contractingForceMultiplier, 0.1f, 5.0f, true);
@@ -1017,9 +1092,9 @@ namespace BetterResearchMenu
             InitPhysics(true);
         }
 
-        private void DrawBubble(Rect rect, ResearchProjectDef proj, float iconPadding, bool drawSilhouette = false)
+        private void DrawBubble(Rect rect, ResearchProjectDef proj, float iconPadding, List<ResearchProjectDef> activeProjs, bool drawSilhouette = false)
         {
-            var tex = proj.IsFinished ? TexGreenBubble : proj == Find.ResearchManager.currentProj ? TexOrangeBubble : TexBubble;
+            var tex = proj.IsFinished ? TexGreenBubble : activeProjs.Contains(proj) ? TexOrangeBubble : TexBubble;
             GUI.DrawTexture(rect, tex);
 
             if (proj.ProgressPercent > 0f && !proj.IsFinished)
@@ -1125,6 +1200,11 @@ namespace BetterResearchMenu
 
         private string GetLockedReason(ResearchProjectDef proj)
         {
+            if (BetterResearchMenuMod.settings.restrictResearchToTechLevel && proj.techLevel > Faction.OfPlayer.def.techLevel && proj.tab != DefsOf.Anomaly && proj.tab != DefsOf.VGE_Gravtech)
+            {
+                return "Locked".Translate() + ": " + "BRM_CannotAccessEra".Translate();
+            }
+
             vanillaResearchWindow ??= new MainTabWindow_Research();
             vanillaResearchWindow.selectedProject = proj;
             vanillaResearchWindow.curTabInt = proj.tab;
