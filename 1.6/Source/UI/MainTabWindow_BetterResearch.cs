@@ -608,7 +608,7 @@ namespace BetterResearchMenu
             float searchBarWidth = 200f;
             float searchBarHeight = 24f;
             var searchBarRect = new Rect(graphRect.width - searchBarWidth - 4f, 4f, searchBarWidth, searchBarHeight);
-            var pivot = new Vector2(graphRect.width / 2f, graphRect.height / 2f);
+            var pivot = new Vector2(graphRect.width / 2f, (inRect.height - TopBarHeight - 40f) / 2f);
 
             var panelRect = new Rect(inRect.width - RightPanelWidth, TopBarHeight, RightPanelWidth, graphRect.height);
 
@@ -795,12 +795,13 @@ namespace BetterResearchMenu
                 }
 
                 bool isFoundation = node.IsFoundation();
+                bool isLocked = !node.def.CanStartNow && !node.def.IsFinished;
 
                 if (node.state == NodeState.Dot || node.state == NodeState.Minimized)
                 {
                     var hitSize = NodeSizeMinimized * zoom;
                     var isHovering = Vector2.Distance(screenPos, localMousePos) < hitSize / 2f;
-                    var drawState = (node.state == NodeState.Minimized || isHovering) ? NodeState.Minimized : NodeState.Dot;
+                    var drawState = (node.state == NodeState.Minimized || isHovering || isLocked) ? NodeState.Minimized : NodeState.Dot;
 
                     var size = (drawState == NodeState.Minimized ? NodeSizeMinimized : NodeSizeDot) * zoom;
                     if (isFoundation && drawState == NodeState.Minimized) size *= 1.5f;
@@ -823,7 +824,7 @@ namespace BetterResearchMenu
 
                         if (drawState == NodeState.Minimized)
                         {
-                            if (!node.def.CanStartNow && !node.def.IsFinished)
+                            if (isLocked)
                             {
                                 GUI.DrawTexture(buttonRect.ContractedBy(4f * zoom), TexLock);
                             }
