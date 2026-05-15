@@ -26,9 +26,10 @@ namespace BetterResearchMenu
                     win.ForceEra(ext.targetLevel);
             }
 
-            if (BetterResearchMenuMod.settings.autoOpenMenuOnFinish && Current.ProgramState == ProgramState.Playing)
+            if (Find.TickManager.TicksGame > 0 && BetterResearchMenuMod.settings.autoOpenMenuOnFinish && Current.ProgramState == ProgramState.Playing)
             {
-                Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Research);
+                LongEventHandler.ExecuteWhenFinished(() =>
+                    Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Research));
             }
         }
     }
