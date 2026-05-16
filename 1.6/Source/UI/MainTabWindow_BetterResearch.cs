@@ -21,6 +21,7 @@ namespace BetterResearchMenu
         public NodeState state;
         public bool isDragging;
         public int edgeCount;
+        public bool isAnchor;
 
         public bool isPhantom;
         public TechLevel phantomEra;
@@ -394,6 +395,24 @@ namespace BetterResearchMenu
                 }
             }
 
+            var anchor = nodes.Where(n => !n.isPhantom && n.def.IsFinished)
+                              .OrderBy(n => n.def.prerequisites?.Count ?? 0)
+                              .FirstOrDefault();
+
+            if (anchor == null)
+            {
+                anchor = nodes.Where(n => !n.isPhantom)
+                              .OrderBy(n => n.def.prerequisites?.Count ?? 0)
+                              .FirstOrDefault();
+            }
+
+            if (anchor != null)
+            {
+                anchor.isAnchor = true;
+                anchor.pos = Vector2.zero;
+                State.nodePositions[GetCacheKey(anchor)] = Vector2.zero;
+            }
+
             if (previouslySelectedDef != null)
             {
                 selectedNode = nodes.FirstOrDefault(n => !n.isPhantom && n.def == previouslySelectedDef);
@@ -483,11 +502,15 @@ namespace BetterResearchMenu
         private void InitPhysicsLayout()
         {
             physicsTemperature = 100f;
+            var loop = 0;
             for (var i = 0; i < 1500; i++)
             {
                 PhysicsTick(0.016f, true);
-                if (nodes.Count > 0 && velocitySum / nodes.Count < 0.01f) break;
+                loop = i;
+                int activeCount = nodes.Count(n => n.state != NodeState.Hidden);
+                if (activeCount > 0 && velocitySum / activeCount < 0.01f) break;
             }
+            Log.Message(currentEra.ToStringHuman() + " - end of loop: " + loop);
             foreach (var node in nodes)
             {
                 node.drawPos = node.pos;
@@ -630,13 +653,16 @@ namespace BetterResearchMenu
             var clingMultiplier = 20f;
 
             velocitySum = 0f;
+            int activeNodeCount = 0;
             foreach (var node in nodes)
             {
-                if (node.isDragging || node.state == NodeState.Hidden)
+                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor)
                 {
                     node.velocity = Vector2.zero;
                     continue;
                 }
+
+                activeNodeCount++;
 
                 var force = Vector2.zero;
                 bool nodeIsFoundation = node.IsFoundation();
@@ -685,8 +711,16 @@ namespace BetterResearchMenu
                 int connCount = 0;
                 foreach (var edge in edges)
                 {
-                    if (edge.from == node) { connectedCenter += edge.to.pos; connCount++; }
-                    else if (edge.to == node) { connectedCenter += edge.from.pos; connCount++; }
+                    if (edge.from == node)
+                    {
+                        if (edge.to.state == NodeState.Hidden) continue;
+                        connectedCenter += edge.to.pos; connCount++;
+                    }
+                    else if (edge.to == node)
+                    {
+                        if (edge.from.state == NodeState.Hidden) continue;
+                        connectedCenter += edge.from.pos; connCount++;
+                    }
                 }
                 if (connCount > 0)
                 {
@@ -705,11 +739,11 @@ namespace BetterResearchMenu
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
-            if (nodes.Count > 0 && velocitySum / nodes.Count < 0.01f) { physicsTemperature = 0f; return; }
+            if (activeNodeCount > 0 && velocitySum / activeNodeCount < 0.01f) { physicsTemperature = 0f; return; }
 
             foreach (var node in nodes)
             {
-                if (node.isDragging || node.state == NodeState.Hidden) continue;
+                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor) continue;
 
                 var move = node.velocity * dt * 8.0f;
 
