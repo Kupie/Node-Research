@@ -24,5 +24,6 @@
         <li>Ludeon.RimWorld.Odyssey</li>
         <li>brrainz.harmony</li>
         <li>oskarpotocki.vfe.tribals</li>
+        <li>oskarpotocki.vfe.classical</li>
     </loadAfter>
 </ModMetaData>

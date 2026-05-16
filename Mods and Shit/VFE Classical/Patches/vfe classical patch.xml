@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Patch>
+
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_Togas"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_TemperatureControl"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_MeatDrying"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_Mosaics"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_Thermaebath"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_DramaAndComedy"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>CentralRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+
+
+
+
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_BronzeWorking"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>EasternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_CraftingBench"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>EasternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_CementMaking"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>EasternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_WoodfiredCrematorium"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>EasternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_TyrianProduction"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>EasternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_HeavyShieldMaking"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_LegionaryArmaments"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_LegionnaireArmor"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_CenturionArmor"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_Scorpion"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="VFEC_Beacons"]</xpath>
+      <value>
+        <li Class="BetterResearchMenu.ResearchIconExtension">
+          <markerTexPath>WesternRepublic</markerTexPath>
+        </li>
+      </value>
+  </Operation>
+
+</Patch>

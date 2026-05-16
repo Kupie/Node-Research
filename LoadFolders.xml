@@ -3,5 +3,6 @@
     <li>/</li>
     <li>1.6</li>
     <li IfModActive="oskarpotocki.vfe.tribals">Mods and Shit/VFE Tribals</li>
+    <li IfModActive="oskarpotocki.vfe.classical">Mods and Shit/VFE Classical</li>
   </v1.6>
 </loadFolders>
