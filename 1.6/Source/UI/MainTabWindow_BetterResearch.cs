@@ -455,6 +455,8 @@ namespace BetterResearchMenu
                     if (def.techLevel < Faction.OfPlayer.def.techLevel) return NodeState.Hidden;
                     var ext = def.GetModExtension<EmergenceExtension>();
                     if (ext.targetLevel <= Faction.OfPlayer.def.techLevel) return NodeState.Hidden;
+                    GetAdvancementProgressRaw(def.techLevel, DefsOf.Main, out int finished, out int total);
+                    if (finished != total) return NodeState.Hidden;
                 }
             }
 
