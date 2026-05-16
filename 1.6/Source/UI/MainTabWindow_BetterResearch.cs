@@ -773,7 +773,7 @@ namespace BetterResearchMenu
                     var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
 
                     float baseSize = node.state == NodeState.Minimized ? NodeSizeMinimized : (node.state == NodeState.Dot ? NodeSizeDot : (node.IsFoundation() ? NodeSizeExpanded * 2f : NodeSizeExpanded));
-                    var nodeSize = node.GetNodeSize(baseSize, node.state);
+                    var nodeSize = node.GetNodeSize(baseSize, node.state) * zoom;
                     if (Vector2.Distance(screenPos, localMousePos) < nodeSize / 2f)
                     {
                         hoveredNode = node;
