@@ -131,6 +131,7 @@ namespace BetterResearchMenu
         private Vector2 dragOffset;
         private Vector2 dragStartMousePos;
         private bool wasDraggingNode;
+        private bool hasSignificantDrag;
         private Rect graphRect;
         private float prevPanelWidth = 0f;
         private Vector2 lastMousePos;
@@ -534,7 +535,7 @@ namespace BetterResearchMenu
 
             currentBgColor = Color.Lerp(currentBgColor, CurTab == DefsOf.Anomaly ? ColorAnomalyBackground : CurTab == DefsOf.VGE_Gravtech ? ColorVGEBackground : ColorGraphBackground, Time.deltaTime * 5f);
 
-            if (wasDraggingNode)
+            if (wasDraggingNode && hasSignificantDrag)
             {
                 physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
@@ -798,6 +799,7 @@ namespace BetterResearchMenu
 
                             hoveredNode.isDragging = true;
                             wasDraggingNode = true;
+                            hasSignificantDrag = false;
                             dragStartMousePos = localMousePos;
                             var worldMousePos = ((localMousePos - pivot) / zoom) - cameraOffset;
                             dragOffset = hoveredNode.pos - worldMousePos;
@@ -877,10 +879,14 @@ namespace BetterResearchMenu
                             }
                         }
                     }
-                    physicsTemperature = Mathf.Max(physicsTemperature, 100f);
+                    if (hasSignificantDrag)
+                    {
+                        physicsTemperature = Mathf.Max(physicsTemperature, 100f);
+                    }
                 }
 
                 wasDraggingNode = false;
+                hasSignificantDrag = false;
                 foreach (var node in nodes)
                     node.isDragging = false;
             }
@@ -889,6 +895,7 @@ namespace BetterResearchMenu
             {
                 if (node.isDragging && Event.current.type == EventType.MouseDrag)
                 {
+                    hasSignificantDrag = true;
                     node.pos = ((localMousePos - pivot) / zoom) - cameraOffset + dragOffset;
                     node.velocity = Vector2.zero;
                     node.dampVelocity = Vector2.zero;
