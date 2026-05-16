@@ -483,9 +483,10 @@ namespace BetterResearchMenu
         private void InitPhysicsLayout()
         {
             physicsTemperature = 100f;
-            for (var i = 0; i < 500; i++)
+            for (var i = 0; i < 1500; i++)
             {
                 PhysicsTick(0.016f, true);
+                if (nodes.Count > 0 && velocitySum / nodes.Count < 0.01f) break;
             }
             foreach (var node in nodes)
             {
