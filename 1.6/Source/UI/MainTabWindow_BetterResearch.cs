@@ -186,7 +186,7 @@ namespace BetterResearchMenu
         {
             if (!cachedCustomTextures.TryGetValue(texPath, out var tex))
             {
-                tex = ContentFinder<Texture2D>.Get(texPath, false);
+                tex = ContentFinder<Texture2D>.Get(texPath, true);
                 cachedCustomTextures[texPath] = tex;
             }
             return tex;

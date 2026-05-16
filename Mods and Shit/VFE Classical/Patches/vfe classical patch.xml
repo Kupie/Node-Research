@@ -6,7 +6,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_Togas"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -15,7 +15,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_TemperatureControl"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -24,7 +24,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_MeatDrying"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -33,7 +33,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_Mosaics"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -42,7 +42,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_Thermaebath"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -51,7 +51,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_DramaAndComedy"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>CentralRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/CentralRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
