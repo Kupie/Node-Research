@@ -65,7 +65,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_BronzeWorking"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>EasternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/EasternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -75,7 +75,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_CraftingBench"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>EasternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/EasternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -84,7 +84,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_CementMaking"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>EasternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/EasternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -93,7 +93,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_WoodfiredCrematorium"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>EasternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/EasternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -102,7 +102,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_TyrianProduction"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>EasternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/EasternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -113,7 +113,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_HeavyShieldMaking"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -122,7 +122,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_LegionaryArmaments"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -132,7 +132,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_LegionnaireArmor"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -141,7 +141,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_CenturionArmor"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -150,7 +150,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_Scorpion"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
@@ -159,7 +159,7 @@
     <xpath>Defs/ResearchProjectDef[defName="VFEC_Beacons"]</xpath>
       <value>
         <li Class="BetterResearchMenu.ResearchIconExtension">
-          <markerTexPath>WesternRepublic</markerTexPath>
+          <markerTexPath>ResearchIcons/WesternRepublic</markerTexPath>
         </li>
       </value>
   </Operation>
