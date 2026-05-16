@@ -789,7 +789,7 @@ namespace BetterResearchMenu
 
                 if (Event.current.type == EventType.MouseDown && (Event.current.button == 0 || Event.current.button == 1 || Event.current.button == 2))
                 {
-                    if (hoveredNode != null)
+                    if (hoveredNode != null && Event.current.button != 2)
                     {
                         if (Event.current.button == 0)
                         {
@@ -810,7 +810,7 @@ namespace BetterResearchMenu
                     }
                     else if (Event.current.button != 1)
                     {
-                        if (Event.current.button == 0)
+                        if (Event.current.button == 0 && hoveredNode == null)
                         {
                             selectionLocked = false;
                             selectedNode = null;
