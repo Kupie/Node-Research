@@ -26,6 +26,12 @@ namespace BetterResearchMenu
         public TechLevel phantomEra;
         public float RadiusMultiplier => this.IsFoundation() ? 1.5f : 1.0f;
         public float SpacingMultiplier => (state == NodeState.Dot || state == NodeState.Minimized) ? 0.5f : 1.0f;
+
+        public float GetNodeSize(float baseSize, NodeState currentState)
+        {
+            if (!this.IsFoundation()) return baseSize;
+            return currentState == NodeState.Minimized ? baseSize * 1.875f : baseSize * 1.75f;
+        }
     }
     public class ResearchEdge
     {
@@ -48,6 +54,7 @@ namespace BetterResearchMenu
         private static Texture2D TexPhysics = ContentFinder<Texture2D>.Get("UI/PhysicsToggle");
         private static Texture2D TexVanilla = ContentFinder<Texture2D>.Get("UI/TreeToggle");
         private static Texture2D TexLock = ContentFinder<Texture2D>.Get("UI/Lock");
+        private static Texture2D TexSettings = ContentFinder<Texture2D>.Get("UI/Settings");
         private static Texture2D texGradient;
         public static Dictionary<TechLevel, Texture2D> TechLevelIcons = new Dictionary<TechLevel, Texture2D>
         {
@@ -141,7 +148,20 @@ namespace BetterResearchMenu
         private Dictionary<string, NodeState> godModeStateSnapshot = null;
 
         public override float Margin => 0f;
-        public override Vector2 InitialSize => new Vector2(UI.screenWidth, base.InitialSize.y * 1.3f);
+        public override Vector2 InitialSize
+        {
+            get
+            {
+                Vector2 requestedTabSize = RequestedTabSize;
+                requestedTabSize.x = UI.screenWidth;
+                requestedTabSize.y *= 1.3f;
+                if (requestedTabSize.y > (float)(UI.screenHeight - 35))
+                {
+                    requestedTabSize.y = UI.screenHeight - 35;
+                }
+                return requestedTabSize;
+            }
+        }
         private bool LeftBarVisible =>
             CurTab == DefsOf.Main &&
             BetterResearchMenuMod.settings.enableTechAdvancement;
@@ -220,6 +240,28 @@ namespace BetterResearchMenu
                     list.Add(Find.ResearchManager.currentProj);
             }
             return list;
+        }
+
+        private void CollapseNode(ResearchNode node)
+        {
+            if (node == null) return;
+            node.state = NodeState.Minimized;
+            State.nodeStates[node.def.defName] = node.state;
+
+            physicsTemperature = Mathf.Max(physicsTemperature, 50f);
+
+            Vector2 impulse = Vector2.zero;
+            int parentCount = 0;
+            foreach (var edge in edges)
+            {
+                if (edge.to == node && edge.from.state != NodeState.Hidden)
+                {
+                    impulse += (edge.from.pos - node.pos).normalized;
+                    parentCount++;
+                }
+            }
+            if (parentCount > 0) node.velocity += (impulse / parentCount) * 450f;
+            DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
         }
 
         public override void PreOpen()
@@ -409,6 +451,7 @@ namespace BetterResearchMenu
                 if (def.HasModExtension<EmergenceExtension>())
                 {
                     if (!BetterResearchMenuMod.settings.enableEmergence) return NodeState.Hidden;
+                    if (def.techLevel < Faction.OfPlayer.def.techLevel) return NodeState.Hidden;
                     var ext = def.GetModExtension<EmergenceExtension>();
                     if (ext.targetLevel <= Faction.OfPlayer.def.techLevel) return NodeState.Hidden;
                 }
@@ -694,7 +737,7 @@ namespace BetterResearchMenu
             }
             graphRect = new Rect(0f, TopBarHeight, inRect.width - panelWidth, inRect.height - TopBarHeight - BottomBarHeight);
 
-            float leftBarShift = LeftBarVisible ? 60f : 5f;
+            float leftBarShift = LeftBarVisible ? 45f : 5f;
 
             var controlAreaRect = new Rect(leftBarShift + 5f, graphRect.height - 115f, 250f, 130f);
             float searchBarWidth = 200f;
@@ -728,9 +771,9 @@ namespace BetterResearchMenu
                     if (node.isPhantom) continue;
                     if (!NodeMatchesSearch(node)) continue;
                     var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
-                    var isFoundation = node.IsFoundation();
-                    var nodeSize = (node.state == NodeState.Dot || node.state == NodeState.Minimized) ? NodeSizeMinimized : (isFoundation ? NodeSizeExpanded * 2f : NodeSizeExpanded);
-                    nodeSize *= zoom;
+
+                    float baseSize = node.state == NodeState.Minimized ? NodeSizeMinimized : (node.state == NodeState.Dot ? NodeSizeDot : (node.IsFoundation() ? NodeSizeExpanded * 2f : NodeSizeExpanded));
+                    var nodeSize = node.GetNodeSize(baseSize, node.state);
                     if (Vector2.Distance(screenPos, localMousePos) < nodeSize / 2f)
                     {
                         hoveredNode = node;
@@ -761,10 +804,7 @@ namespace BetterResearchMenu
                         }
                         else if (Event.current.button == 1)
                         {
-                            hoveredNode.state = NodeState.Minimized;
-                            State.nodeStates[hoveredNode.def.defName] = hoveredNode.state;
-                            physicsTemperature = Mathf.Max(physicsTemperature, 20f);
-                            DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
+                            CollapseNode(hoveredNode);
                         }
                         Event.current.Use();
                     }
@@ -921,8 +961,9 @@ namespace BetterResearchMenu
                     var isHovering = Vector2.Distance(screenPos, localMousePos) < hitSize / 2f;
                     var drawState = (node.state == NodeState.Minimized || isHovering || isLocked) ? NodeState.Minimized : NodeState.Dot;
 
-                    var size = (drawState == NodeState.Minimized ? NodeSizeMinimized : NodeSizeDot) * zoom;
-                    if ((isFoundation || isEmergence) && drawState == NodeState.Minimized) size *= 1.5f;
+                    float baseSize = drawState == NodeState.Minimized ? NodeSizeMinimized : NodeSizeDot;
+                    var size = node.GetNodeSize(baseSize, drawState) * zoom;
+                    if (isEmergence && drawState == NodeState.Minimized) size *= 1.5f;
                     var buttonRect = new Rect(screenPos.x - size / 2f, screenPos.y - size / 2f, size, size);
 
                     if (node.def.IsFinished)
@@ -1028,7 +1069,7 @@ namespace BetterResearchMenu
 
             if (LeftBarVisible)
             {
-                float leftBarWidth = 50f;
+                float leftBarWidth = 35f;
                 var leftBarRect = new Rect(0f, TopBarHeight, leftBarWidth + 5f, inRect.height - TopBarHeight - BottomBarHeight);
                 var advanceBtnRect = new Rect(leftBarWidth + 15f, TopBarHeight + 15f, 200f, 40f);
                 if (leftBarRect.Contains(mousePos) || advanceBtnRect.Contains(mousePos))
@@ -1127,7 +1168,7 @@ namespace BetterResearchMenu
         {
             if (!LeftBarVisible) return;
 
-            float leftBarWidth = 50f;
+            float leftBarWidth = 35f;
             var playerEra = Faction.OfPlayer.def.techLevel;
             var leftRect = new Rect(0f, TopBarHeight, leftBarWidth, inRect.height - TopBarHeight - BottomBarHeight);
             var progress = GetAdvancementProgress(out var finished, out var total);
@@ -1141,7 +1182,7 @@ namespace BetterResearchMenu
                 {
                     Faction.OfPlayer.def.techLevel = nextEra;
                     Find.WindowStack.Add(new Window_TechAdvance(nextEra));
-                    bool hasProjectsInNextEra = DefDatabase<ResearchProjectDef>.AllDefs.Any(x => x.techLevel == nextEra && x.tab == CurTab);
+                    var hasProjectsInNextEra = DefDatabase<ResearchProjectDef>.AllDefs.Any(x => x.techLevel == nextEra && x.tab == CurTab);
                     if (hasProjectsInNextEra)
                         currentEra = nextEra;
                     InitPhysics(true);
@@ -1154,7 +1195,7 @@ namespace BetterResearchMenu
         {
             if (LeftBarVisible)
             {
-                float leftBarWidth = 50f;
+                float leftBarWidth = 35f;
                 float iconSize = 40f;
                 float iconMargin = 5f;
                 float labelWidth = 200f;
@@ -1208,12 +1249,9 @@ namespace BetterResearchMenu
             Text.Font = GameFont.Medium;
             if (Widgets.ButtonText(new Rect(panelRect.x + btnMargin, panelRect.y + btnMargin, btnSize, btnSize), "—", drawBackground: false, textColor: Color.white, doMouseoverSound: true))
             {
-                selectedNode.state = NodeState.Minimized;
-                State.nodeStates[selectedNode.def.defName] = NodeState.Minimized;
+                CollapseNode(selectedNode);
                 selectedNode = null;
                 selectedProject = null;
-                physicsTemperature = Mathf.Max(physicsTemperature, 20f);
-                DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
             }
             if (Widgets.ButtonText(new Rect(panelRect.xMax - btnSize - 5, panelRect.y + btnMargin, btnSize, btnSize), "x", drawBackground: false, textColor: Color.white, doMouseoverSound: true))
             {
@@ -1368,6 +1406,14 @@ namespace BetterResearchMenu
                 SoundDefOf.TabOpen.PlayOneShotOnCamera();
             }
             TooltipHandler.TipRegion(vanillaBtnRect, "BRM_OpenVanillaMenu".Translate());
+
+            var settingsBtnRect = new Rect(vanillaBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
+            if (Widgets.ButtonImage(settingsBtnRect, TexSettings))
+            {
+                Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<BetterResearchMenuMod>()));
+                SoundDefOf.Click.PlayOneShotOnCamera();
+            }
+            TooltipHandler.TipRegion(settingsBtnRect, "BRM_OpenSettings".Translate());
 
             float oldGrav = BetterResearchMenuMod.settings.centerForceMultiplier;
             float oldSpace = BetterResearchMenuMod.settings.spacingForceMultiplier;

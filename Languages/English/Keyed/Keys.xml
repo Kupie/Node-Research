@@ -35,6 +35,7 @@
   <BRM_ActiveBasicResearch>Active basic research: {0}</BRM_ActiveBasicResearch>
   <BRM_ActiveAdvancedResearch>Active advanced research: {0}</BRM_ActiveAdvancedResearch>
   <BRM_TogglePhysics>Toggle movement/physics</BRM_TogglePhysics>
+  <BRM_OpenSettings>Open mod settings</BRM_OpenSettings>
   <BRM_OpenVanillaMenu>Open vanilla research menu</BRM_OpenVanillaMenu>
   <BRM_RevealAllInGodMode>Reveal all nodes in God Mode</BRM_RevealAllInGodMode>
   <BRM_EnableEmergence>Enable 'Emergence' advancing nodes</BRM_EnableEmergence>
