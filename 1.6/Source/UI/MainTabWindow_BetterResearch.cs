@@ -25,6 +25,7 @@ namespace BetterResearchMenu
         public bool isPhantom;
         public TechLevel phantomEra;
         public float RadiusMultiplier => this.IsFoundation() ? 1.5f : 1.0f;
+        public float SpacingMultiplier => (state == NodeState.Dot || state == NodeState.Minimized) ? 0.5f : 1.0f;
     }
     public class ResearchEdge
     {
@@ -122,7 +123,6 @@ namespace BetterResearchMenu
         private Vector2 dragStartMousePos;
         private bool wasDraggingNode;
         private Rect graphRect;
-        private new QuickSearchWidget quickSearchWidget = new QuickSearchWidget();
         private float prevPanelWidth = 0f;
         private Vector2 lastMousePos;
         private static Color currentBgColor = new ColorInt(15, 20, 26).ToColor;
@@ -254,7 +254,8 @@ namespace BetterResearchMenu
             {
                 if (def.tab != CurTab) continue;
                 if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && def.techLevel != currentEra) continue;
-                if (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
+                bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
+                if (!godModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
 
                 var node = new ResearchNode { def = def };
                 node.state = GetNodeState(def);
@@ -404,8 +405,12 @@ namespace BetterResearchMenu
                 if (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted)
                     return NodeState.Hidden;
 
-                if (def.HasModExtension<EmergenceExtension>() && !BetterResearchMenuMod.settings.enableEmergence)
-                    return NodeState.Hidden;
+                if (def.HasModExtension<EmergenceExtension>())
+                {
+                    if (!BetterResearchMenuMod.settings.enableEmergence) return NodeState.Hidden;
+                    var ext = def.GetModExtension<EmergenceExtension>();
+                    if (ext.targetLevel <= Faction.OfPlayer.def.techLevel) return NodeState.Hidden;
+                }
             }
 
             if (State.nodeStates.TryGetValue(def.defName, out var state))
@@ -432,7 +437,7 @@ namespace BetterResearchMenu
             physicsTemperature = 100f;
             for (var i = 0; i < 500; i++)
             {
-                PhysicsTick(0.016f);
+                PhysicsTick(0.016f, true);
             }
             foreach (var node in nodes)
             {
@@ -505,9 +510,9 @@ namespace BetterResearchMenu
             }
         }
 
-        private void PhysicsTick(float dt)
+        private void PhysicsTick(float dt, bool ignoreSettings = false)
         {
-            if (!BetterResearchMenuMod.settings.physicsEnabled) { physicsTemperature = 0f; return; }
+            if (!BetterResearchMenuMod.settings.physicsEnabled && !ignoreSettings) { physicsTemperature = 0f; return; }
             if (physicsTemperature < 0.5f) { physicsTemperature = 0f; velocitySum = 0f; return; }
 
             var k = 500f;
@@ -527,6 +532,7 @@ namespace BetterResearchMenu
 
                 var force = Vector2.zero;
                 bool nodeIsFoundation = node.IsFoundation();
+                float nodeRadius = node.RadiusMultiplier * node.SpacingMultiplier;
 
                 foreach (var other in nodes)
                 {
@@ -538,7 +544,8 @@ namespace BetterResearchMenu
                     if (dist < maxRepulsionDistance)
                     {
                         bool otherIsFoundation = other.IsFoundation();
-                        float effectiveK = k * ((node.RadiusMultiplier + other.RadiusMultiplier) * 0.5f);
+                        float otherRadius = other.RadiusMultiplier * other.SpacingMultiplier;
+                        float effectiveK = k * ((nodeRadius + otherRadius) * 0.5f);
                         float forceMag = (effectiveK * effectiveK / dist) * BetterResearchMenuMod.settings.spacingForceMultiplier;
                         if (nodeIsFoundation && otherIsFoundation) forceMag *= 3f;
                         force += dir / dist * forceMag;
@@ -553,7 +560,8 @@ namespace BetterResearchMenu
                     var dir = other.pos - node.pos;
                     var dist = dir.magnitude;
 
-                    float adjustedK = k * ((node.RadiusMultiplier + other.RadiusMultiplier) * 0.5f);
+                    float otherRadius = other.RadiusMultiplier * other.SpacingMultiplier;
+                    float adjustedK = k * ((nodeRadius + otherRadius) * 0.5f);
 
                     if (dist > 5f)
                     {
@@ -612,7 +620,6 @@ namespace BetterResearchMenu
         public override void DoWindowContents(Rect inRect)
         {
             activeProjectsCacheDirty = true;
-            if (Event.current.type == EventType.Layout) UpdateSearchResults();
 
             var targetBgColor = CurTab == DefsOf.Anomaly ? ColorAnomalyBackground : CurTab == DefsOf.VGE_Gravtech ? ColorVGEBackground : ColorGraphBackground;
             GUI.color = currentBgColor;
@@ -629,7 +636,7 @@ namespace BetterResearchMenu
 
             float leftBarShift = LeftBarVisible ? 60f : 5f;
 
-            var controlAreaRect = new Rect(leftBarShift + 30f, graphRect.height - 120f, 220f, 90f);
+            var controlAreaRect = new Rect(leftBarShift + 5f, graphRect.height - 115f, 250f, 130f);
             float searchBarWidth = 200f;
             float searchBarHeight = 24f;
             var searchBarRect = new Rect(graphRect.width - searchBarWidth - 4f, 4f, searchBarWidth, searchBarHeight);
@@ -642,9 +649,6 @@ namespace BetterResearchMenu
             var mousePos = Event.current.mousePosition;
             var localMousePos = mousePos - new Vector2(graphRect.x, graphRect.y);
 
-            Rect interactionExclusion = controlAreaRect;
-            interactionExclusion.x -= 30f;
-
             bool mouseInPanel = selectedNode != null && panelRect.Contains(Event.current.mousePosition);
             bool mouseOverLeftBar = LeftBarVisible && new Rect(0f, TopBarHeight, 55f, inRect.height - TopBarHeight - BottomBarHeight).Contains(mousePos);
             bool mouseOverAdvance = false;
@@ -654,7 +658,7 @@ namespace BetterResearchMenu
                 if (advanceBtnRect.Contains(mousePos)) mouseOverAdvance = true;
             }
 
-            if (!mouseInPanel && !mouseOverLeftBar && !mouseOverAdvance && !interactionExclusion.Contains(localMousePos) && !searchBarRect.Contains(localMousePos) && graphRect.Contains(mousePos))
+            if (!mouseInPanel && !mouseOverLeftBar && !mouseOverAdvance && !controlAreaRect.Contains(localMousePos) && !searchBarRect.Contains(localMousePos) && graphRect.Contains(mousePos))
             {
                 ResearchNode hoveredNode = null;
                 for (var i = nodes.Count - 1; i >= 0; i--)
@@ -662,6 +666,7 @@ namespace BetterResearchMenu
                     var node = nodes[i];
                     if (node.state == NodeState.Hidden) continue;
                     if (node.isPhantom) continue;
+                    if (!NodeMatchesSearch(node)) continue;
                     var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
                     var isFoundation = node.IsFoundation();
                     var nodeSize = (node.state == NodeState.Dot || node.state == NodeState.Minimized) ? NodeSizeMinimized : (isFoundation ? NodeSizeExpanded * 2f : NodeSizeExpanded);
@@ -792,7 +797,7 @@ namespace BetterResearchMenu
 
             Widgets.BeginGroup(graphRect);
             DrawGraphControls(controlAreaRect);
-            quickSearchWidget.OnGUI(searchBarRect);
+            quickSearchWidget.OnGUI(searchBarRect, UpdateSearchResults);
 
             Vector2 WorldToScreen(Vector2 worldPos)
             {
@@ -972,9 +977,6 @@ namespace BetterResearchMenu
 
             Vector2 localMousePos = mousePos - new Vector2(graphRect.x, graphRect.y);
 
-            Rect totalExclusion = sliderExcl;
-            totalExclusion.x -= 30f;
-
             if (Event.current.type == EventType.MouseDown)
                 lastMousePos = localMousePos;
             if (Event.current.type == EventType.ScrollWheel && graphRect.Contains(Event.current.mousePosition))
@@ -984,7 +986,7 @@ namespace BetterResearchMenu
                 Event.current.Use();
             }
 
-            if (!totalExclusion.Contains(localMousePos) && !searchBarExcl.Contains(localMousePos) && isPanning && Event.current.type == EventType.MouseDrag)
+            if (!sliderExcl.Contains(localMousePos) && !searchBarExcl.Contains(localMousePos) && isPanning && Event.current.type == EventType.MouseDrag)
             {
                 cameraOffset += (localMousePos - lastMousePos) / zoom;
                 lastMousePos = localMousePos;
@@ -1032,7 +1034,8 @@ namespace BetterResearchMenu
                 Text.Anchor = TextAnchor.MiddleLeft;
                 if (Widgets.ButtonInvisible(segRect))
                 {
-                    if (techLevel != TechLevel.Undefined && BetterResearchMenuMod.settings.restrictResearchToTechLevel && techLevel > Faction.OfPlayer.def.techLevel)
+                    bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
+                    if (techLevel != TechLevel.Undefined && BetterResearchMenuMod.settings.restrictResearchToTechLevel && techLevel > Faction.OfPlayer.def.techLevel && !godModeReveal)
                     {
                         Messages.Message("BRM_CannotAccessEra".Translate(), MessageTypeDefOf.RejectInput, false);
                     }
@@ -1309,11 +1312,11 @@ namespace BetterResearchMenu
             float sliderHeight = 22f;
             float verticalSpacing = 6f;
             float iconSize = 16f;
-            float sliderWidth = controlAreaRect.width - 20f;
+            float sliderWidth = controlAreaRect.width - 25f;
 
-            var gravityRect = new Rect(controlAreaRect.x, controlAreaRect.y + ControlBtnSize + verticalSpacing, sliderWidth, sliderHeight);
-            var spacingRect = new Rect(controlAreaRect.x, gravityRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
-            var contractingRect = new Rect(controlAreaRect.x, spacingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
+            var gravityRect = new Rect(controlAreaRect.x + 25f, controlAreaRect.y + ControlBtnSize + verticalSpacing, sliderWidth, sliderHeight);
+            var spacingRect = new Rect(controlAreaRect.x + 25f, gravityRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
+            var contractingRect = new Rect(controlAreaRect.x + 25f, spacingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
 
             GUI.DrawTexture(new Rect(gravityRect.x - 24f, gravityRect.y + 1f, 16f, 16f), TexCenter);
             BetterResearchMenuMod.settings.centerForceMultiplier = Widgets.HorizontalSlider(gravityRect, BetterResearchMenuMod.settings.centerForceMultiplier, 0.1f, 5.0f, true);
