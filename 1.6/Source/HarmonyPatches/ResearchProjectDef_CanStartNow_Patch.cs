@@ -9,9 +9,7 @@ namespace BetterResearchMenu
     {
         public static void Postfix(ResearchProjectDef __instance, ref bool __result)
         {
-            bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
-
-            if (__result && !godModeReveal && BetterResearchMenuMod.settings.restrictResearchToTechLevel)
+            if (__result && MainTabWindow_BetterResearch.GodModeReveal is false && BetterResearchMenuMod.settings.restrictResearchToTechLevel)
             {
                 if (DefsOf.Anomaly != null && __instance.tab == DefsOf.Anomaly) return;
                 if (DefsOf.VGE_Gravtech != null && __instance.tab == DefsOf.VGE_Gravtech) return;

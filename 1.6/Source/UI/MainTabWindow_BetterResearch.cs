@@ -37,17 +37,17 @@ namespace BetterResearchMenu
     [StaticConstructorOnStartup]
     public class MainTabWindow_BetterResearch : MainTabWindow_Research
     {
-        public static Texture2D TexBubble = ContentFinder<Texture2D>.Get("UI/Bubble");
-        public static Texture2D TexGreenBubble = ContentFinder<Texture2D>.Get("UI/GreenBubble");
-        public static Texture2D TexOrangeBubble = ContentFinder<Texture2D>.Get("UI/OrangeBubble");
-        public static readonly Texture2D TexBarBg = SolidColorMaterials.NewSolidColorTexture(new Color(0.1f, 0.1f, 0.1f));
-        public static readonly Texture2D TexBarFill = SolidColorMaterials.NewSolidColorTexture(new ColorInt(125, 183, 96).ToColor);
-        public static Texture2D TexCenter = ContentFinder<Texture2D>.Get("UI/CenterSlider");
-        public static Texture2D TexSpacing = ContentFinder<Texture2D>.Get("UI/SpacingSlider");
-        public static Texture2D TexContracting = ContentFinder<Texture2D>.Get("UI/ContractingSlider");
-        public static Texture2D TexPhysics = ContentFinder<Texture2D>.Get("UI/PhysicsToggle");
-        public static Texture2D TexVanilla = ContentFinder<Texture2D>.Get("UI/TreeToggle");
-        public static Texture2D TexLock = ContentFinder<Texture2D>.Get("UI/Lock");
+        private static Texture2D TexBubble = ContentFinder<Texture2D>.Get("UI/Bubble");
+        private static Texture2D TexGreenBubble = ContentFinder<Texture2D>.Get("UI/GreenBubble");
+        private static Texture2D TexOrangeBubble = ContentFinder<Texture2D>.Get("UI/OrangeBubble");
+        private static readonly Texture2D TexBarBg = SolidColorMaterials.NewSolidColorTexture(new Color(0.1f, 0.1f, 0.1f));
+        private static readonly Texture2D TexBarFill = SolidColorMaterials.NewSolidColorTexture(new ColorInt(125, 183, 96).ToColor);
+        private static Texture2D TexCenter = ContentFinder<Texture2D>.Get("UI/CenterSlider");
+        private static Texture2D TexSpacing = ContentFinder<Texture2D>.Get("UI/SpacingSlider");
+        private static Texture2D TexContracting = ContentFinder<Texture2D>.Get("UI/ContractingSlider");
+        private static Texture2D TexPhysics = ContentFinder<Texture2D>.Get("UI/PhysicsToggle");
+        private static Texture2D TexVanilla = ContentFinder<Texture2D>.Get("UI/TreeToggle");
+        private static Texture2D TexLock = ContentFinder<Texture2D>.Get("UI/Lock");
         private static Texture2D texGradient;
         public static Dictionary<TechLevel, Texture2D> TechLevelIcons = new Dictionary<TechLevel, Texture2D>
         {
@@ -91,6 +91,8 @@ namespace BetterResearchMenu
         private float RightPanelWidth = 300f;
         private float NodeSizeExpanded = 80f;
         private float BottomBarHeight => GetActiveProjectsCached(CurTab).Count > 0 ? 80f : 40f;
+
+        public static bool GodModeReveal => BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
         private float NodeSizeMinimized = 40f;
         private float NodeSizeDot = 20f;
         private static Color ColorBoxBackground = new ColorInt(38, 36, 36).ToColor;
@@ -135,12 +137,14 @@ namespace BetterResearchMenu
 
         private List<ResearchProjectDef> activeProjectsCache;
         private bool activeProjectsCacheDirty = true;
+        private bool lastGodMode = false;
+        private Dictionary<string, NodeState> godModeStateSnapshot = null;
 
         public override float Margin => 0f;
         public override Vector2 InitialSize => new Vector2(UI.screenWidth, base.InitialSize.y * 1.3f);
         private bool LeftBarVisible =>
             CurTab == DefsOf.Main &&
-            BetterResearchMenuMod.settings.enableTechAdvancement && !BetterResearchMenuMod.settings.enableEmergence;
+            BetterResearchMenuMod.settings.enableTechAdvancement;
 
         private string GetCacheKey(ResearchNode node) =>
             node.isPhantom ? $"phantom_{(int)node.phantomEra}_{(int)currentEra}" : GetCacheKey(node.def);
@@ -254,8 +258,7 @@ namespace BetterResearchMenu
             {
                 if (def.tab != CurTab) continue;
                 if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && def.techLevel != currentEra) continue;
-                bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
-                if (!godModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
+                if (!GodModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
 
                 var node = new ResearchNode { def = def };
                 node.state = GetNodeState(def);
@@ -395,9 +398,7 @@ namespace BetterResearchMenu
 
         private NodeState GetNodeState(ResearchProjectDef def)
         {
-            bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
-
-            if (!godModeReveal)
+            if (!GodModeReveal)
             {
                 if (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel)
                     return NodeState.Hidden;
@@ -457,6 +458,13 @@ namespace BetterResearchMenu
                 InitPhysics(true);
             }
 
+            bool currentGodMode = GodModeReveal;
+            if (currentGodMode != lastGodMode)
+            {
+                lastGodMode = currentGodMode;
+                OnGodModeChanged(currentGodMode);
+            }
+
             if (selectedProject != null && (selectedNode == null || selectedNode.def != selectedProject))
             {
                 selectedNode = nodes.FirstOrDefault(n => !n.isPhantom && n.def == selectedProject);
@@ -507,6 +515,58 @@ namespace BetterResearchMenu
             {
                 foreach (var node in nodes)
                     node.drawPos = node.pos;
+            }
+        }
+
+        private void OnGodModeChanged(bool godModeOn)
+        {
+            bool anyChanged = false;
+
+            if (godModeOn)
+            {
+                godModeStateSnapshot = new Dictionary<string, NodeState>(State.nodeStates);
+
+                foreach (var def in DefDatabase<ResearchProjectDef>.AllDefsListForReading)
+                {
+                    if (def.tab != CurTab) continue;
+                    bool wouldBeHidden =
+                        (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel) ||
+                        (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) ||
+                        def.HasModExtension<EmergenceExtension>();
+                    if (wouldBeHidden)
+                    {
+                        State.nodeStates[def.defName] = NodeState.Expanded;
+                        anyChanged = true;
+                    }
+                }
+            }
+            else
+            {
+                if (godModeStateSnapshot != null)
+                {
+                    foreach (var def in DefDatabase<ResearchProjectDef>.AllDefsListForReading)
+                    {
+                        if (def.tab != CurTab) continue;
+                        bool wouldBeHidden =
+                            (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel) ||
+                            (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) ||
+                            def.HasModExtension<EmergenceExtension>();
+                        if (!wouldBeHidden) continue;
+
+                        if (godModeStateSnapshot.TryGetValue(def.defName, out var original))
+                            State.nodeStates[def.defName] = original;
+                        else
+                            State.nodeStates.Remove(def.defName);
+                        anyChanged = true;
+                    }
+                    godModeStateSnapshot = null;
+                }
+            }
+
+            if (anyChanged)
+            {
+                InitPhysics(false);
+                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
         }
 
@@ -732,7 +792,7 @@ namespace BetterResearchMenu
                         selectionLocked = true;
                         if (selectedNode.state == NodeState.Minimized || selectedNode.state == NodeState.Dot)
                         {
-                            if (!selectedNode.def.CanStartNow && !selectedNode.def.IsFinished)
+                            if (!GodModeReveal && !selectedNode.def.CanStartNow && !selectedNode.def.IsFinished)
                             {
                                 var reasons = GetLockedReasons(selectedNode.def);
                                 Messages.Message("Locked".Translate() + (reasons.Count > 0 ? ": " + reasons[0] : ""), MessageTypeDefOf.RejectInput, false);
@@ -754,6 +814,8 @@ namespace BetterResearchMenu
                                         if (State.nodeStates.TryGetValue(oldestDefName, out var s) && s == NodeState.Expanded)
                                         {
                                             State.nodeStates[oldestDefName] = NodeState.Minimized;
+                                            var oldNode = nodes.FirstOrDefault(n => !n.isPhantom && n.def.defName == oldestDefName);
+                                            if (oldNode != null) oldNode.state = NodeState.Minimized;
                                         }
                                     }
                                 }
@@ -764,7 +826,7 @@ namespace BetterResearchMenu
                         }
                         else if (selectedNode.state == NodeState.Expanded)
                         {
-                            if (!selectedNode.def.CanStartNow && !selectedNode.def.IsFinished)
+                            if (!GodModeReveal && !selectedNode.def.CanStartNow && !selectedNode.def.IsFinished)
                             {
                                 var reasons = GetLockedReasons(selectedNode.def);
                                 Messages.Message("Locked".Translate() + (reasons.Count > 0 ? ": " + reasons[0] : ""), MessageTypeDefOf.RejectInput, false);
@@ -1034,8 +1096,7 @@ namespace BetterResearchMenu
                 Text.Anchor = TextAnchor.MiddleLeft;
                 if (Widgets.ButtonInvisible(segRect))
                 {
-                    bool godModeReveal = BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
-                    if (techLevel != TechLevel.Undefined && BetterResearchMenuMod.settings.restrictResearchToTechLevel && techLevel > Faction.OfPlayer.def.techLevel && !godModeReveal)
+                    if (techLevel != TechLevel.Undefined && BetterResearchMenuMod.settings.restrictResearchToTechLevel && techLevel > Faction.OfPlayer.def.techLevel && !GodModeReveal)
                     {
                         Messages.Message("BRM_CannotAccessEra".Translate(), MessageTypeDefOf.RejectInput, false);
                     }
@@ -1080,7 +1141,9 @@ namespace BetterResearchMenu
                 {
                     Faction.OfPlayer.def.techLevel = nextEra;
                     Find.WindowStack.Add(new Window_TechAdvance(nextEra));
-                    currentEra = nextEra;
+                    bool hasProjectsInNextEra = DefDatabase<ResearchProjectDef>.AllDefs.Any(x => x.techLevel == nextEra && x.tab == CurTab);
+                    if (hasProjectsInNextEra)
+                        currentEra = nextEra;
                     InitPhysics(true);
                     DefsOf.BRM_Advancement.PlayOneShotOnCamera();
                 }
@@ -1160,7 +1223,8 @@ namespace BetterResearchMenu
             Text.Anchor = TextAnchor.UpperLeft;
             Text.Font = GameFont.Small;
             if (selectedNode is null) return;
-            var proj = selectedNode.def;
+            if (selectedProject != selectedNode.def) selectedProject = selectedNode.def;
+            var proj = selectedProject;
 
             float subY = panelRect.y + 50f;
             using (new TextBlock(GameFont.Medium, TextAnchor.MiddleLeft))

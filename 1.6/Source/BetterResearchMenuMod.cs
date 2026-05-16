@@ -5,6 +5,7 @@ using Verse;
 
 namespace BetterResearchMenu
 {
+    [HotSwappable]
     public class BetterResearchMenuMod : Mod
     {
         public static BetterResearchMenuSettings settings;
@@ -13,11 +14,16 @@ namespace BetterResearchMenu
             settings = GetSettings<BetterResearchMenuSettings>();
             new Harmony("BetterResearchMenuMod").PatchAll();
         }
-
+        private Vector2 scrollPos;
+        private float scrollHeight = 99999999;
         public override void DoSettingsWindowContents(Rect inRect)
         {
+            var viewRect = new Rect(0f, 0f, inRect.width - 16, scrollHeight);
+            scrollHeight = 0;
+            Widgets.BeginScrollView(inRect, ref scrollPos, viewRect);
             var ls = new Listing_Standard();
-            ls.Begin(inRect);
+            ls.Begin(viewRect);
+            var initY = ls.curY;
             ls.CheckboxLabeled("BRM_RestrictResearchTechLevel".Translate(), ref settings.restrictResearchToTechLevel);
             ls.CheckboxLabeled("BRM_RestrictViewingFutureTechLevels".Translate(), ref settings.restrictViewingFutureTechLevels);
             ls.CheckboxLabeled("BRM_RestrictViewingFutureProjects".Translate(), ref settings.restrictViewingFutureProjects);
@@ -82,6 +88,8 @@ namespace BetterResearchMenu
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);
             }
             ls.End();
+            Widgets.EndScrollView();
+            scrollHeight = ls.curY - initY;
         }
 
         public override void WriteSettings()
