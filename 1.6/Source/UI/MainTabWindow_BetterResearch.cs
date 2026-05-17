@@ -33,6 +33,7 @@ namespace BetterResearchMenu
         public bool isLockedCache;
         public bool matchesSearchCache;
         public int childCount;
+        public HashSet<ResearchNode> connectedNodes = new HashSet<ResearchNode>();
 
         public float RadiusMultiplier => this.isFoundation ? 1.5f : 1.0f;
         public float SpacingMultiplier => (state == NodeState.Dot || state == NodeState.Minimized) ? 0.5f : 1.0f;
@@ -414,6 +415,8 @@ namespace BetterResearchMenu
                         parentNode.edgeCount++;
                         parentNode.childCount++;
                         node.edgeCount++;
+                        parentNode.connectedNodes.Add(node);
+                        node.connectedNodes.Add(parentNode);
                     }
                 }
             }
@@ -455,6 +458,8 @@ namespace BetterResearchMenu
                             phantom.edgeCount++;
                             phantom.childCount++;
                             node.edgeCount++;
+                            phantom.connectedNodes.Add(node);
+                            node.connectedNodes.Add(phantom);
                         }
                     }
                 }
@@ -750,7 +755,7 @@ namespace BetterResearchMenu
                     {
                         if (node.isAnchor || other.isAnchor) continue;
 
-                        bool isDirectlyLinked = edges.Any(e => (e.from == node && e.to == other) || (e.from == other && e.to == node));
+                        bool isDirectlyLinked = node.connectedNodes.Contains(other);
                         bool otherIsFoundation = other.isFoundation;
                         float otherRadius = other.RadiusMultiplier * other.SpacingMultiplier;
                         float effectiveK = k * ((nodeRadius + otherRadius) * 0.5f);
