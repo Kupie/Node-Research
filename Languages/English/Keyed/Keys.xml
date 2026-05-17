@@ -26,6 +26,7 @@
   <BRM_Researching>Researching...</BRM_Researching>
   <BRM_CurrentlyResearching>Currently researching: {0}</BRM_CurrentlyResearching>
   <BRM_FoundationsComplete>{0}/{1} foundations complete</BRM_FoundationsComplete>
+  <BRM_ProjectsComplete>{0}/{1} projects complete</BRM_ProjectsComplete>
   <BRM_RequiresDiscovery>This node requires discovery of something in the world.</BRM_RequiresDiscovery>
   <BRM_Continue>Continue</BRM_Continue>
   <BRM_Foundation>FOUNDATION</BRM_Foundation>

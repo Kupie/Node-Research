@@ -836,8 +836,13 @@ namespace BetterResearchMenu
 
                     if (!isDirectlyLinked)
                     {
-                        if (node.childCount > 0 && other.childCount == 0) forceMag *= 3.5f;
-                        else if (node.childCount > 0 && other.childCount > 0) forceMag *= 2f;
+                        if (node.childCount > 0 && other.childCount == 0)
+                            forceMag *= 3.5f;
+                        else if (node.childCount > 0 && other.childCount > 0)
+                        {
+                            float childBonus = (node.childCount + other.childCount) * 0.5f;
+                            forceMag *= Mathf.Min(10f, 2f + childBonus);
+                        }
                     }
 
                     if (nodeIsFoundation && otherIsFoundation) forceMag *= 3f;
@@ -1458,13 +1463,17 @@ namespace BetterResearchMenu
                 Text.Font = GameFont.Small;
                 if (progress < 1f)
                 {
+                    string transKey = BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.EraCompletion
+                        ? "BRM_ProjectsComplete"
+                        : "BRM_FoundationsComplete";
+
                     if (total == 0)
                     {
-                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(0, 0));
+                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), transKey.Translate(0, 0));
                     }
                     else
                     {
-                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), "BRM_FoundationsComplete".Translate(finished, total));
+                        Widgets.Label(new Rect(leftRect.xMax + 5, leftRect.y, labelWidth, labelHeight), transKey.Translate(finished, total));
                     }
                 }
             }
