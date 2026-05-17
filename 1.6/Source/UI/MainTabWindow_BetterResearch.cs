@@ -836,12 +836,16 @@ namespace BetterResearchMenu
 
                     if (!isDirectlyLinked)
                     {
-                        if (node.childCount > 0 && other.childCount == 0)
-                            forceMag *= 3.5f;
-                        else if (node.childCount > 0 && other.childCount > 0)
+                        int totalChildren = node.childCount + other.childCount;
+
+                        if (totalChildren > 0)
                         {
-                            float childBonus = (node.childCount + other.childCount) * 0.5f;
-                            forceMag *= Mathf.Min(10f, 2f + childBonus);
+                            float childBonus = totalChildren * 0.5f;
+                            forceMag *= Mathf.Min(12f, 2f + childBonus);
+                        }
+                        else
+                        {
+                            forceMag *= 1.5f;
                         }
                     }
 

@@ -15,15 +15,34 @@ namespace BetterResearchMenu
             new Harmony("BetterResearchMenuMod").PatchAll();
         }
         private Vector2 scrollPos;
-        private float scrollHeight = 99999999;
         public override void DoSettingsWindowContents(Rect inRect)
         {
-            var viewRect = new Rect(0f, 0f, inRect.width - 16, scrollHeight);
-            scrollHeight = 0;
+            float width = inRect.width - 18f;
+            var height = CalculateHeight(width);
+            var viewRect = new Rect(0f, 0f, width, height);
+
             Widgets.BeginScrollView(inRect, ref scrollPos, viewRect);
             var ls = new Listing_Standard();
             ls.Begin(viewRect);
-            var initY = ls.curY;
+            DrawSettings(ls);
+            ls.End();
+            Widgets.EndScrollView();
+        }
+
+        private float CalculateHeight(float width)
+        {
+            GUI.BeginGroup(new Rect(-9999f, -9999f, 1f, 1f));
+            var ls = new Listing_Standard();
+            ls.Begin(new Rect(0f, 0f, width, 99999f));
+            DrawSettings(ls, true);
+            float height = ls.CurHeight;
+            ls.End();
+            GUI.EndGroup();
+            return height;
+        }
+
+        private void DrawSettings(Listing_Standard ls, bool dryRun = false)
+        {
             ls.CheckboxLabeled("BRM_RestrictResearchTechLevel".Translate(), ref settings.restrictResearchToTechLevel);
             ls.CheckboxLabeled("BRM_RestrictViewingFutureTechLevels".Translate(), ref settings.restrictViewingFutureTechLevels);
             ls.CheckboxLabeled("BRM_RestrictViewingFutureProjects".Translate(), ref settings.restrictViewingFutureProjects);
@@ -47,7 +66,7 @@ namespace BetterResearchMenu
                 _ => settings.advancementTiedTo.ToString()
             };
 
-            if (ls.ButtonText("BRM_AdvancementTiedTo".Translate(currentAdvancementLabel)))
+            if (ls.ButtonText("BRM_AdvancementTiedTo".Translate(currentAdvancementLabel)) && !dryRun)
             {
                 var list = new List<FloatMenuOption>
                 {
@@ -87,9 +106,6 @@ namespace BetterResearchMenu
             {
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);
             }
-            ls.End();
-            Widgets.EndScrollView();
-            scrollHeight = ls.curY - initY;
         }
 
         public override void WriteSettings()
