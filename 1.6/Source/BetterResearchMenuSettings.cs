@@ -35,6 +35,7 @@ namespace BetterResearchMenu
         public float spacingForceMultiplier = 1f;
         public float contractingForceMultiplier = 1f;
         public float centerForceMultiplier = 1f;
+        public int stressTestCount = 0;
 
         public override void ExposeData()
         {
@@ -67,6 +68,7 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1f);
             Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1f);
             Scribe_Values.Look(ref centerForceMultiplier, "centerForceMultiplier", 1f);
+            Scribe_Values.Look(ref stressTestCount, "stressTestCount", 0);
         }
 
         public float GetEmergenceCost(TechLevel level)

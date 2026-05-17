@@ -174,6 +174,7 @@ namespace BetterResearchMenu
         private Vector2 lastMousePos;
         private static Color currentBgColor = new ColorInt(15, 20, 26).ToColor;
         private static Dictionary<string, Vector2> cachedCameraOffsets = [];
+        private static HashSet<string> seededLayoutKeys = new HashSet<string>();
 
         private static Dictionary<ResearchProjectDef, List<Def>> cachedUnlockedDefs = [];
         private static Dictionary<ResearchProjectDef, CachedProjInfo> projInfoCache = new Dictionary<ResearchProjectDef, CachedProjInfo>();
@@ -397,6 +398,12 @@ namespace BetterResearchMenu
                 if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && def.techLevel != currentEra) continue;
                 if (!GodModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
 
+                if (def.defName.StartsWith("StressTest_"))
+                {
+                    int.TryParse(def.defName.Split('_')[1], out int nodeIndex);
+                    if (nodeIndex >= BetterResearchMenuMod.settings.stressTestCount) continue;
+                }
+
                 var node = new ResearchNode { def = def };
                 node.isFoundation = def.IsFoundation();
                 node.isEmergence = def.HasModExtension<EmergenceExtension>();
@@ -468,6 +475,13 @@ namespace BetterResearchMenu
             foreach (var node in nodes)
                 node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
 
+            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
+            if (!seededLayoutKeys.Contains(layoutKey))
+            {
+                SeedHierarchicalPositions();
+                seededLayoutKeys.Add(layoutKey);
+            }
+
             if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined)
             {
                 phantomEdgeSet.Clear();
@@ -537,13 +551,6 @@ namespace BetterResearchMenu
                               .FirstOrDefault();
             }
 
-            if (anchor != null)
-            {
-                anchor.isAnchor = true;
-                anchor.pos = Vector2.zero;
-                State.nodePositions[anchor.cachedKey] = Vector2.zero;
-            }
-
             if (previouslySelectedDef != null)
             {
                 selectedNode = nodes.FirstOrDefault(n => !n.isPhantom && n.def == previouslySelectedDef);
@@ -584,6 +591,79 @@ namespace BetterResearchMenu
                     cachedCameraOffsets[key] = cameraOffset;
                 }
             }
+        }
+
+        private void SeedHierarchicalPositions()
+        {
+            var foundations = nodes.Where(n => n.isFoundation && !n.isPhantom).ToList();
+            if (foundations.Count == 0) return;
+
+            float foundationRadius = 700f * Mathf.Sqrt(Mathf.Max(1, foundations.Count));
+            for (int i = 0; i < foundations.Count; i++)
+            {
+                float angle = (float)i / foundations.Count * Mathf.PI * 2f;
+                foundations[i].pos = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * foundationRadius;
+            }
+
+            var nodeSet = new HashSet<ResearchNode>(nodes.Where(n => !n.isPhantom));
+            var placed = new HashSet<ResearchNode>();
+            var pendingParentCount = new Dictionary<ResearchNode, int>();
+
+            foreach (var node in nodeSet)
+            {
+                if (node.isFoundation) { placed.Add(node); continue; }
+                int inCount = 0;
+                foreach (var edge in node.nodeEdges)
+                    if (edge.to == node && nodeSet.Contains(edge.from)) inCount++;
+                pendingParentCount[node] = inCount;
+            }
+
+            var ready = new Queue<ResearchNode>(foundations);
+
+            while (ready.Count > 0)
+            {
+                var current = ready.Dequeue();
+
+                foreach (var edge in current.nodeEdges)
+                {
+                    if (edge.from != current) continue;
+                    var child = edge.to;
+                    if (!nodeSet.Contains(child) || placed.Contains(child)) continue;
+
+                    pendingParentCount[child]--;
+                    if (pendingParentCount[child] > 0) continue;
+
+                    Vector2 parentCentroid = Vector2.zero;
+                    int parentCount = 0;
+                    foreach (var ce in child.nodeEdges)
+                    {
+                        if (ce.to != child) continue;
+                        if (!placed.Contains(ce.from)) continue;
+                        parentCentroid += ce.from.pos;
+                        parentCount++;
+                    }
+                    if (parentCount > 0) parentCentroid /= parentCount;
+
+                    Vector2 outwardDir = parentCentroid.magnitude > 1f
+                        ? parentCentroid.normalized
+                        : Rand.UnitVector2;
+
+                    child.pos = parentCentroid + outwardDir * 150f
+                        + new Vector2(Rand.Range(-50f, 50f), Rand.Range(-50f, 50f));
+                    placed.Add(child);
+                    ready.Enqueue(child);
+                }
+            }
+
+            foreach (var node in nodeSet)
+            {
+                if (placed.Contains(node)) continue;
+                node.pos = new Vector2(Rand.Range(-200f, 200f), Rand.Range(-200f, 200f));
+            }
+
+            foreach (var node in nodes)
+                if (!node.isPhantom)
+                    State.nodePositions[node.cachedKey] = node.pos;
         }
 
         private NodeState GetNodeState(ResearchProjectDef def)
@@ -787,8 +867,7 @@ namespace BetterResearchMenu
 
             var k = 500f;
             var minDistance = 15f;
-            var maxRepulsionDistance = 500f;
-            var dampingFactor = 0.5f;
+            var dampingFactor = 0.1f;
             var clingMultiplier = 20f;
 
             if (nodeRadiusCache.Length < nodes.Count)
@@ -822,69 +901,78 @@ namespace BetterResearchMenu
 
                     var dir = node.pos - other.pos;
                     var sqrDist = dir.sqrMagnitude;
-                    if (sqrDist >= maxRepulsionDistance * maxRepulsionDistance) continue;
+                    float currentMaxDist = (nodeIsFoundation && other.isFoundation) ? 3000f
+                        : (nodeIsFoundation || other.isFoundation) ? 350f
+                        : 150f;
+                    if (sqrDist >= currentMaxDist * currentMaxDist) continue;
 
                     var dist = Mathf.Sqrt(sqrDist);
                     if (dist < minDistance) { dir = Rand.UnitVector2; dist = minDistance; }
                     if (other.isAnchor) continue;
 
                     var isDirectlyLinked = node.connectedNodes.Contains(other);
+                    if (isDirectlyLinked) continue;
+
                     bool otherIsFoundation = other.isFoundation;
                     float otherRadius = nodeRadiusCache[oi];
                     float effectiveK = k * ((nodeRadius + otherRadius) * 0.5f);
                     float forceMag = (effectiveK * effectiveK / dist) * BetterResearchMenuMod.settings.spacingForceMultiplier;
 
-                    if (!isDirectlyLinked)
+                    if (nodeIsFoundation && other.isFoundation)
                     {
-                        int totalChildren = node.childCount + other.childCount;
-
-                        if (totalChildren > 0)
-                        {
-                            float childBonus = totalChildren * 0.5f;
-                            forceMag *= Mathf.Min(12f, 2f + childBonus);
-                        }
-                        else
-                        {
-                            forceMag *= 1.5f;
-                        }
+                        float chargeA = 30f + Mathf.Sqrt(node.childCount) * 2.5f;
+                        float chargeB = 30f + Mathf.Sqrt(other.childCount) * 2.5f;
+                        forceMag *= chargeA * chargeB;
+                        if (dist < 1000f) forceMag *= 2.0f;
                     }
-
-                    if (nodeIsFoundation && otherIsFoundation) forceMag *= 3f;
+                    else
+                    {
+                        forceMag *= 2f;
+                    }
                     force += dir / dist * forceMag;
                 }
 
-                Vector2 connectedCenter = Vector2.zero;
-                int connCount = 0;
+                Vector2 parentCentroid = Vector2.zero;
+                int parentCount = 0;
+
                 foreach (var edge in node.nodeEdges)
                 {
                     var other = edge.from == node ? edge.to : edge.from;
                     if (other.state == NodeState.Hidden) continue;
 
+                    bool otherIsParent = (edge.to == node);
+
                     var dir = other.pos - node.pos;
                     var dist = dir.magnitude;
                     float otherRadius = nodeRadiusCache[other.nodeIndex];
                     float adjustedK = k * ((nodeRadius + otherRadius) * 0.5f);
-                    if (dist > 5f)
+
+                    if (dist > 5f && otherIsParent)
                     {
                         var strength = BetterResearchMenuMod.settings.contractingForceMultiplier;
                         if (node.state == NodeState.Dot || node.state == NodeState.Minimized)
                             strength *= clingMultiplier;
                         force += dir / dist * (dist * dist / adjustedK) * strength;
+
+                        parentCentroid += other.pos;
+                        parentCount++;
                     }
-
-                    connectedCenter += other.pos;
-                    connCount++;
                 }
-                if (connCount > 0)
+
+                if (parentCount > 0 && !nodeIsFoundation)
                 {
-                    connectedCenter /= connCount;
-                    Vector2 offset = connectedCenter - node.pos;
-                    if (offset.magnitude > 300f)
-                        force += offset * 2.0f;
+                    parentCentroid /= parentCount;
+                    Vector2 offset = parentCentroid - node.pos;
+                    force += offset * 1.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
                 }
 
-                float centerForce = 0.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                if (node.edgeCount == 0) centerForce *= 10f;
+                float centerForce;
+                if (node.edgeCount == 0)
+                    centerForce = 2f * BetterResearchMenuMod.settings.centerForceMultiplier;
+                else if (nodeIsFoundation)
+                    centerForce = 0.15f * BetterResearchMenuMod.settings.centerForceMultiplier;
+                else
+                    centerForce = 0f;
                 force -= node.pos * centerForce;
 
                 node.velocity = (node.velocity + (force / node.cachedMass) * dt) * dampingFactor;
@@ -892,6 +980,27 @@ namespace BetterResearchMenu
             }
 
             if (activeNodeCount > 0 && velocitySum / activeNodeCount < 0.01f) { physicsTemperature = 0f; return; }
+
+            {
+                float cx = 0f, cy = 0f;
+                int cnt = 0;
+                for (int ni = 0; ni < nodeCount; ni++)
+                {
+                    var n = nodes[ni];
+                    if (n.state != NodeState.Hidden) { cx += n.pos.x; cy += n.pos.y; cnt++; }
+                }
+                if (cnt > 0)
+                {
+                    cx /= cnt; cy /= cnt;
+                    var shift = new Vector2(cx, cy) * 0.08f;
+                    for (int ni = 0; ni < nodeCount; ni++)
+                    {
+                        var n = nodes[ni];
+                        if (n.state != NodeState.Hidden && !n.isDragging)
+                            n.pos -= shift;
+                    }
+                }
+            }
 
             foreach (var node in nodes)
             {
@@ -945,7 +1054,7 @@ namespace BetterResearchMenu
 
             float leftBarShift = LeftBarVisible ? 45f : 5f;
 
-            var controlAreaRect = new Rect(leftBarShift + 5f, graphRect.height - 115f, 250f, 130f);
+            var controlAreaRect = new Rect(leftBarShift + 5f, graphRect.height - 145f, 250f, 160f);
             float searchBarWidth = 200f;
             float searchBarHeight = 24f;
             var searchBarRect = new Rect(graphRect.width - searchBarWidth - 4f, 4f, searchBarWidth, searchBarHeight);
@@ -1295,7 +1404,7 @@ namespace BetterResearchMenu
         private void HandleInputs(Rect graphRect, Rect sliderExcl, Rect panelExcl, Rect searchBarExcl, Rect inRect)
         {
             float zoomSensitivity = 0.05f;
-            float minZoom = 0.2f;
+            float minZoom = 0.1f;
             float maxZoom = 3f;
 
             Vector2 mousePos = Event.current.mousePosition;
@@ -1673,6 +1782,7 @@ namespace BetterResearchMenu
             float oldGrav = BetterResearchMenuMod.settings.centerForceMultiplier;
             float oldSpace = BetterResearchMenuMod.settings.spacingForceMultiplier;
             float oldCont = BetterResearchMenuMod.settings.contractingForceMultiplier;
+            int oldStressTest = BetterResearchMenuMod.settings.stressTestCount;
 
             float sliderHeight = 22f;
             float verticalSpacing = 6f;
@@ -1682,6 +1792,7 @@ namespace BetterResearchMenu
             var gravityRect = new Rect(controlAreaRect.x + 25f, controlAreaRect.y + ControlBtnSize + verticalSpacing, sliderWidth, sliderHeight);
             var spacingRect = new Rect(controlAreaRect.x + 25f, gravityRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
             var contractingRect = new Rect(controlAreaRect.x + 25f, spacingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
+            var stressTestRect = new Rect(controlAreaRect.x + 25f, contractingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
 
             GUI.DrawTexture(new Rect(gravityRect.x - 24f, gravityRect.y + 1f, 16f, 16f), TexCenter);
             BetterResearchMenuMod.settings.centerForceMultiplier = Widgets.HorizontalSlider(gravityRect, BetterResearchMenuMod.settings.centerForceMultiplier, 0.1f, 5.0f, true);
@@ -1692,11 +1803,26 @@ namespace BetterResearchMenu
             GUI.DrawTexture(new Rect(contractingRect.x - 24f, contractingRect.y + 1f, iconSize, iconSize), TexContracting);
             BetterResearchMenuMod.settings.contractingForceMultiplier = Widgets.HorizontalSlider(contractingRect, BetterResearchMenuMod.settings.contractingForceMultiplier, 0.1f, 5.0f, true);
 
+            Text.Font = GameFont.Tiny;
+            Widgets.Label(new Rect(stressTestRect.x, stressTestRect.y - 10f, stressTestRect.width, 20f), "Stress Test Nodes: " + BetterResearchMenuMod.settings.stressTestCount);
+            Text.Font = GameFont.Small;
+            int currentStressTestCount = BetterResearchMenuMod.settings.stressTestCount;
+            var newStressTestCount = Widgets.HorizontalSlider(stressTestRect, currentStressTestCount, 0f, 600f, true);
+            BetterResearchMenuMod.settings.stressTestCount = (int)newStressTestCount;
+
             if (oldGrav != BetterResearchMenuMod.settings.centerForceMultiplier ||
                 oldSpace != BetterResearchMenuMod.settings.spacingForceMultiplier ||
-                oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier)
+                oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier ||
+                oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
             {
-                physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+                if (oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
+                {
+                    PreOpen();
+                }
+                else
+                {
+                    physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+                }
             }
         }
 
