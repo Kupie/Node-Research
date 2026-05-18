@@ -872,13 +872,8 @@ namespace BetterResearchMenu
             physicsTickCount++;
 
             velocitySum = 0f;
-            int activeNodeCount = 0;
             int nodeCount = nodes.Count;
-
-            if (nodeRadiusCache.Length < nodes.Count)
-                nodeRadiusCache = new float[nodes.Count];
-            for (int i = 0; i < nodes.Count; i++)
-                nodeRadiusCache[i] = nodes[i].RadiusMultiplier * nodes[i].SpacingMultiplier;
+            int activeNodeCount = 0;
 
             for (int ni = 0; ni < nodeCount; ni++)
             {
@@ -890,8 +885,8 @@ namespace BetterResearchMenu
                 }
 
                 activeNodeCount++;
-                var repulsionForce = Vector2.zero;
-                var attractionForce = Vector2.zero;
+                Vector2 repulsion = Vector2.zero;
+                Vector2 attraction = Vector2.zero;
 
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
@@ -899,122 +894,91 @@ namespace BetterResearchMenu
                     var other = nodes[oi];
                     if (other.state == NodeState.Hidden) continue;
 
-                    var dir = node.pos - other.pos;
-                    float sqrDist = dir.sqrMagnitude;
+                    Vector2 dir = node.pos - other.pos;
+                    float dist = dir.magnitude;
+                    if (dist < 1f) { dir = Rand.UnitVector2; dist = 1f; }
 
-                    var dist = Mathf.Sqrt(sqrDist);
-                    if (dist < 1f)
-                    {
-                        float angle = (ni > oi) ? ni : oi;
-                        dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-                        if (ni < oi) dir = -dir;
-                        dist = 1f;
-                    }
+                    float k = 500f * BetterResearchMenuMod.settings.spacingForceMultiplier;
+                    float weight = (1f + Mathf.Sqrt(node.childCount) * 0.5f) * (1f + Mathf.Sqrt(other.childCount) * 0.5f);
 
-                    float k_rep = 200f * BetterResearchMenuMod.settings.spacingForceMultiplier;
-                    if (node.isFoundation && other.isFoundation) k_rep *= 3f;
-                    else if (node.isFoundation || other.isFoundation) k_rep *= 1.5f;
+                    float forceMag = (k * k / dist) * 0.2f * weight;
+                    if (node.connectedNodes.Contains(other)) forceMag *= 0.4f;
 
-                    if (node.state == NodeState.Minimized || other.state == NodeState.Minimized)
-                        k_rep *= 0.75f;
-
-                    float cutoff = k_rep * 4f;
-                    if (dist >= cutoff) continue;
-
-                    float force = (k_rep * k_rep) / dist;
-                    force *= (1f - (dist / cutoff));
-
-                    float weightA = 1f + Mathf.Sqrt(node.childCount) * 0.5f;
-                    float weightB = 1f + Mathf.Sqrt(other.childCount) * 0.5f;
-                    force *= weightA * weightB;
-
-                    if (node.connectedNodes.Contains(other)) force *= 0.4f;
-
-                    repulsionForce += (dir / dist) * force;
+                    repulsion += (dir / dist) * forceMag;
                 }
 
-                bool hasParent = false;
                 foreach (var edge in node.nodeEdges)
                 {
-                    var other = edge.from == node ? edge.to : edge.from;
+                    var other = (edge.from == node) ? edge.to : edge.from;
                     if (other.state == NodeState.Hidden) continue;
-                    if (edge.to == node) hasParent = true;
 
-                    var dir = other.pos - node.pos;
+                    Vector2 dir = other.pos - node.pos;
                     float dist = dir.magnitude;
-                    if (dist < 1f) continue;
+                    if (dist < 10f) continue;
 
                     float k_att = 200f * BetterResearchMenuMod.settings.contractingForceMultiplier;
-
-                    if (node.state == NodeState.Dot || node.state == NodeState.Minimized ||
-                        other.state == NodeState.Dot || other.state == NodeState.Minimized)
-                    {
-                        k_att *= 0.5f;
-                    }
-
-                    float force = (dist * dist) / k_att;
-                    attractionForce += (dir / dist) * force;
+                    attraction += (dir / dist) * (dist * dist / k_att);
                 }
 
-                float centerGravity = 0.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                if (node.isFoundation) centerGravity *= 0.1f;
-                else if (hasParent) centerGravity *= 0.05f;
-                else if (node.edgeCount == 0) centerGravity *= 2f;
+                Vector2 totalForce = repulsion + attraction;
 
-                Vector2 centerForce = -node.pos * centerGravity;
+                node.lastRepulsionForce = repulsion;
+                node.lastAttractionForce = attraction;
+                node.lastCenterForce = Vector2.zero;
 
-                node.lastRepulsionForce = repulsionForce;
-                node.lastAttractionForce = attractionForce;
-                node.lastCenterForce = centerForce;
-
-                Vector2 totalForce = repulsionForce + attractionForce + centerForce;
                 node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
-            float maxMove = physicsTemperature * 0.4f;
+            Vector2 netMovement = Vector2.zero;
+            int movedCount = 0;
 
             foreach (var node in nodes)
             {
                 if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
 
-                var move = node.velocity * dt * 8f;
-
-                if (move.magnitude > maxMove)
-                    move = move.normalized * maxMove;
-
+                Vector2 move = node.velocity * dt * 8f;
                 node.pos += move;
+                netMovement += move;
+                movedCount++;
+
                 if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
             }
 
-            if (ignoreSettings)
+            if (movedCount > 0)
             {
-                physicsTemperature *= 0.985f;
+                Vector2 drift = netMovement / movedCount;
+                foreach (var node in nodes)
+                {
+                    if (node.state != NodeState.Hidden && !node.isDragging)
+                        node.pos -= drift;
+                }
             }
+
+            if (ignoreSettings) physicsTemperature *= 0.985f;
             else
             {
                 physicsTemperature *= 0.9f;
-
                 if (isPanning || wasDraggingNode || hasSignificantDrag)
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
             }
 
             if (debugLogNextTick)
+        {
+            debugLogNextTick = false;
+            var topMovers = nodes
+                .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
+                .OrderByDescending(n => n.velocity.sqrMagnitude)
+                .Take(3)
+                .ToList();
+            foreach (var n in topMovers)
             {
-                debugLogNextTick = false;
-                var topMovers = nodes
-                    .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
-                    .OrderByDescending(n => n.velocity.sqrMagnitude)
-                    .Take(3)
-                    .ToList();
-                foreach (var n in topMovers)
-                {
-                    Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
-                        $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
-                }
-                Log.Message($"[BRM PostReheat] velocitySum={velocitySum:F6}, activeNodes={activeNodeCount}");
+                Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
+                    $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
             }
+            Log.Message($"[BRM PostReheat] velocitySum={velocitySum:F6}, activeNodes={activeNodeCount}");
         }
+    }
 
         private float velocitySum = 0f;
         private HashSet<(ResearchNode, ResearchNode)> phantomEdgeSet = new HashSet<(ResearchNode, ResearchNode)>();
