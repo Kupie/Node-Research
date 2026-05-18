@@ -9,9 +9,12 @@ namespace BetterResearchMenu
     public class BetterResearchMenuMod : Mod
     {
         public static BetterResearchMenuSettings settings;
+
+        public static BetterResearchMenuMod instance;
         public BetterResearchMenuMod(ModContentPack pack) : base(pack)
         {
             settings = GetSettings<BetterResearchMenuSettings>();
+            instance = this;
             new Harmony("BetterResearchMenuMod").PatchAll();
         }
         private Vector2 scrollPos;

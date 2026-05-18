@@ -26,6 +26,10 @@ namespace BetterResearchMenu
         public string cachedKey;
         public float cachedMass;
 
+        public Vector2 lastRepulsionForce;
+        public Vector2 lastAttractionForce;
+        public Vector2 lastCenterForce;
+
         public bool isPhantom;
         public TechLevel phantomEra;
         public bool isFoundation;
@@ -155,6 +159,8 @@ namespace BetterResearchMenu
         private float ThicknessUnfinished = 2f;
         private float IconPadding = 12f;
         private float physicsTemperature = 0f;
+        private bool debugLogNextTick = false;
+        private int physicsTickCount = 0;
         private bool isPanning;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
@@ -710,15 +716,16 @@ namespace BetterResearchMenu
             physicsTemperature = 100f;
             var activeCount = nodes.Count(n => n.state != NodeState.Hidden);
             var loop = 0;
-            for (var i = 0; i < 1500; i++)
+            for (var i = 0; i < 2000; i++)
             {
-                PhysicsTick(0.016f, true);
+                PhysicsTick(0.02f, true);
                 loop = i;
                 if (activeCount > 0 && velocitySum / activeCount < 0.001f) break;
             }
             Log.Message(currentEra.ToStringHuman() + " - end of loop: " + loop);
             foreach (var node in nodes)
             {
+                node.velocity = Vector2.zero;
                 node.drawPos = node.pos;
                 if (!node.isPhantom && !node.isAnchor)
                     State.nodePositions[node.cachedKey] = node.pos;
@@ -861,90 +868,69 @@ namespace BetterResearchMenu
         private void PhysicsTick(float dt, bool ignoreSettings = false)
         {
             if (!BetterResearchMenuMod.settings.physicsEnabled && !ignoreSettings) { physicsTemperature = 0f; return; }
-            if (physicsTemperature < 0.5f) { physicsTemperature = 0f; velocitySum = 0f; return; }
+            if (physicsTemperature < 0.01f) { physicsTemperature = 0f; velocitySum = 0f; return; }
+            physicsTickCount++;
 
-            var k = 500f;
-            var minDistance = 15f;
-            var dampingFactor = 0.85f;
-            var clingMultiplier = 5f;
+            velocitySum = 0f;
+            int activeNodeCount = 0;
+            int nodeCount = nodes.Count;
 
             if (nodeRadiusCache.Length < nodes.Count)
                 nodeRadiusCache = new float[nodes.Count];
             for (int i = 0; i < nodes.Count; i++)
                 nodeRadiusCache[i] = nodes[i].RadiusMultiplier * nodes[i].SpacingMultiplier;
 
-            velocitySum = 0f;
-            int activeNodeCount = 0;
-            int nodeCount = nodes.Count;
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor)
+                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom)
                 {
                     node.velocity = Vector2.zero;
                     continue;
                 }
 
                 activeNodeCount++;
-
-                var force = Vector2.zero;
-                bool nodeIsFoundation = node.isFoundation;
-                float nodeRadius = nodeRadiusCache[ni];
+                var repulsionForce = Vector2.zero;
+                var attractionForce = Vector2.zero;
 
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
                     if (ni == oi) continue;
                     var other = nodes[oi];
-                    if (other.state == NodeState.Hidden || other.isAnchor) continue;
+                    if (other.state == NodeState.Hidden) continue;
 
                     var dir = node.pos - other.pos;
-                    var sqrDist = dir.sqrMagnitude;
-
-                    float spaceMult = BetterResearchMenuMod.settings.spacingForceMultiplier;
-
-                    float baseMaxDist = (nodeIsFoundation && other.isFoundation) ? 4000f
-                        : (nodeIsFoundation || other.isFoundation) ? 800f
-                        : 250f;
-                    float currentMaxDist = baseMaxDist * Mathf.Max(0.2f, spaceMult);
-                    if (sqrDist >= currentMaxDist * currentMaxDist) continue;
+                    float sqrDist = dir.sqrMagnitude;
 
                     var dist = Mathf.Sqrt(sqrDist);
-                    if (dist < minDistance) { dir = Rand.UnitVector2; dist = minDistance; }
-
-                    bool isChildOfOther = false;
-                    bool isParentOfOther = false;
-
-                    if (node.connectedNodes.Contains(other))
+                    if (dist < 1f)
                     {
-                        foreach (var edge in node.nodeEdges)
-                        {
-                            if (edge.to == node && edge.from == other) isChildOfOther = true;
-                            if (edge.from == node && edge.to == other) isParentOfOther = true;
-                        }
+                        float angle = (ni > oi) ? ni : oi;
+                        dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                        if (ni < oi) dir = -dir;
+                        dist = 1f;
                     }
 
-                    if (isParentOfOther && !isChildOfOther) continue;
+                    float k_rep = 200f * BetterResearchMenuMod.settings.spacingForceMultiplier;
+                    if (node.isFoundation && other.isFoundation) k_rep *= 3f;
+                    else if (node.isFoundation || other.isFoundation) k_rep *= 1.5f;
 
-                    float otherRadius = nodeRadiusCache[oi];
-                    float effectiveK = k * ((nodeRadius + otherRadius) * 0.5f);
+                    if (node.state == NodeState.Minimized || other.state == NodeState.Minimized)
+                        k_rep *= 0.75f;
 
-                    float chargeA = 1.5f + Mathf.Sqrt(node.childCount) * 1.5f;
-                    float chargeB = 1.5f + Mathf.Sqrt(other.childCount) * 1.5f;
+                    float cutoff = k_rep * 4f;
+                    if (dist >= cutoff) continue;
 
-                    if (nodeIsFoundation) chargeA *= 2f;
-                    if (other.isFoundation) chargeB *= 2f;
+                    float force = (k_rep * k_rep) / dist;
+                    force *= (1f - (dist / cutoff));
 
-                    if (isChildOfOther)
-                    {
-                        chargeA *= 0.4f;
-                        chargeB *= 0.4f;
-                    }
+                    float weightA = 1f + Mathf.Sqrt(node.childCount) * 0.5f;
+                    float weightB = 1f + Mathf.Sqrt(other.childCount) * 0.5f;
+                    force *= weightA * weightB;
 
-                    float forceMag = (effectiveK * effectiveK / dist) * spaceMult;
-                    if (nodeIsFoundation && other.isFoundation) forceMag *= Mathf.Max(1f, spaceMult);
-                    forceMag *= chargeA * chargeB * 0.2f;
+                    if (node.connectedNodes.Contains(other)) force *= 0.4f;
 
-                    force += dir / dist * forceMag;
+                    repulsionForce += (dir / dist) * force;
                 }
 
                 bool hasParent = false;
@@ -952,81 +938,82 @@ namespace BetterResearchMenu
                 {
                     var other = edge.from == node ? edge.to : edge.from;
                     if (other.state == NodeState.Hidden) continue;
-
-                    bool otherIsParent = (edge.to == node);
-                    if (otherIsParent) hasParent = true;
+                    if (edge.to == node) hasParent = true;
 
                     var dir = other.pos - node.pos;
-                    var dist = dir.magnitude;
-                    if (dist < minDistance) continue;
+                    float dist = dir.magnitude;
+                    if (dist < 1f) continue;
 
-                    float otherRadius = nodeRadiusCache[other.nodeIndex];
-                    float adjustedK = k * ((nodeRadius + otherRadius) * 0.5f);
+                    float k_att = 200f * BetterResearchMenuMod.settings.contractingForceMultiplier;
 
-                    var strength = BetterResearchMenuMod.settings.contractingForceMultiplier;
-                    if (node.state == NodeState.Dot || node.state == NodeState.Minimized)
-                        strength *= clingMultiplier;
-
-                    if (otherIsParent)
+                    if (node.state == NodeState.Dot || node.state == NodeState.Minimized ||
+                        other.state == NodeState.Dot || other.state == NodeState.Minimized)
                     {
-                        force += dir / dist * (dist * dist / adjustedK) * strength;
+                        k_att *= 0.5f;
                     }
+
+                    float force = (dist * dist) / k_att;
+                    attractionForce += (dir / dist) * force;
                 }
 
-                float centerForce = 0f;
-                if (node.edgeCount == 0)
-                    centerForce = 2f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                else if (nodeIsFoundation)
-                    centerForce = 0.2f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                else if (!hasParent)
-                    centerForce = 0.05f * BetterResearchMenuMod.settings.centerForceMultiplier;
-                force -= node.pos * centerForce;
+                float centerGravity = 0.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
+                if (node.isFoundation) centerGravity *= 0.1f;
+                else if (hasParent) centerGravity *= 0.05f;
+                else if (node.edgeCount == 0) centerGravity *= 2f;
 
-                node.velocity = (node.velocity + (force / node.cachedMass) * dt) * dampingFactor;
+                Vector2 centerForce = -node.pos * centerGravity;
+
+                node.lastRepulsionForce = repulsionForce;
+                node.lastAttractionForce = attractionForce;
+                node.lastCenterForce = centerForce;
+
+                Vector2 totalForce = repulsionForce + attractionForce + centerForce;
+                node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
-            if (activeNodeCount > 0 && velocitySum / activeNodeCount < 0.001f) { physicsTemperature = 0f; return; }
-
-            {
-                float cx = 0f, cy = 0f;
-                int cnt = 0;
-                for (int ni = 0; ni < nodeCount; ni++)
-                {
-                    var n = nodes[ni];
-                    if (n.state != NodeState.Hidden) { cx += n.pos.x; cy += n.pos.y; cnt++; }
-                }
-                if (cnt > 0)
-                {
-                    cx /= cnt; cy /= cnt;
-                    var shift = new Vector2(cx, cy) * 0.08f;
-                    for (int ni = 0; ni < nodeCount; ni++)
-                    {
-                        var n = nodes[ni];
-                        if (n.state != NodeState.Hidden && !n.isDragging)
-                            n.pos -= shift;
-                    }
-                }
-            }
+            float maxMove = physicsTemperature * 0.4f;
 
             foreach (var node in nodes)
             {
                 if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
 
-                var move = node.velocity * dt * 8.0f;
+                var move = node.velocity * dt * 8f;
 
-                if (!ignoreSettings)
-                {
-                    float maxMove = physicsTemperature * 0.4f;
-                    if (move.magnitude > maxMove) move = move.normalized * maxMove;
-                }
+                if (move.magnitude > maxMove)
+                    move = move.normalized * maxMove;
 
                 node.pos += move;
-                if (!ignoreSettings)
-                    State.nodePositions[node.cachedKey] = node.pos;
+                if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
             }
 
-            physicsTemperature *= 0.99f;
+            if (ignoreSettings)
+            {
+                physicsTemperature *= 0.985f;
+            }
+            else
+            {
+                physicsTemperature *= 0.9f;
+
+                if (isPanning || wasDraggingNode || hasSignificantDrag)
+                    physicsTemperature = Mathf.Max(physicsTemperature, 20f);
+            }
+
+            if (debugLogNextTick)
+            {
+                debugLogNextTick = false;
+                var topMovers = nodes
+                    .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
+                    .OrderByDescending(n => n.velocity.sqrMagnitude)
+                    .Take(3)
+                    .ToList();
+                foreach (var n in topMovers)
+                {
+                    Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
+                        $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
+                }
+                Log.Message($"[BRM PostReheat] velocitySum={velocitySum:F6}, activeNodes={activeNodeCount}");
+            }
         }
 
         private float velocitySum = 0f;
@@ -1771,7 +1758,16 @@ namespace BetterResearchMenu
             if (Widgets.ButtonImage(physicsBtnRect, TexPhysics, BetterResearchMenuMod.settings.physicsEnabled ? Color.white : Color.gray))
             {
                 BetterResearchMenuMod.settings.physicsEnabled = !BetterResearchMenuMod.settings.physicsEnabled;
-                if (BetterResearchMenuMod.settings.physicsEnabled) physicsTemperature = 100f;
+                if (!BetterResearchMenuMod.settings.physicsEnabled)
+                {
+                    physicsTemperature = 0f;
+                    foreach (var node in nodes)
+                    {
+                        node.velocity = Vector2.zero;
+                        node.dampVelocity = Vector2.zero;
+                        node.drawPos = node.pos;
+                    }
+                }
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
             TooltipHandler.TipRegion(physicsBtnRect, "BRM_TogglePhysics".Translate());
@@ -1787,7 +1783,24 @@ namespace BetterResearchMenu
             }
             TooltipHandler.TipRegion(vanillaBtnRect, "BRM_OpenVanillaMenu".Translate());
 
-            var settingsBtnRect = new Rect(vanillaBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
+            var reheatBtnRect = new Rect(vanillaBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
+            if (Widgets.ButtonImage(reheatBtnRect, TexPhysics, Color.yellow))
+            {
+                float maxVel = 0f;
+                ResearchNode maxVelNode = null;
+                foreach (var n in nodes)
+                {
+                    float v = n.velocity.sqrMagnitude;
+                    if (v > maxVel) { maxVel = v; maxVelNode = n; }
+                }
+                Log.Message($"[BRM Reheat] physicsTemperature={physicsTemperature:F4}, velocitySum={velocitySum:F6}, maxNodeVelocity={Mathf.Sqrt(maxVel):F6} ({maxVelNode?.def?.defName ?? "null"})");
+                physicsTemperature = 100f;
+                debugLogNextTick = true;
+                SoundDefOf.Click.PlayOneShotOnCamera();
+            }
+            TooltipHandler.TipRegion(reheatBtnRect, "Reheat (debug)");
+
+            var settingsBtnRect = new Rect(reheatBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
             if (Widgets.ButtonImage(settingsBtnRect, TexSettings))
             {
                 Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<BetterResearchMenuMod>()));
@@ -1831,6 +1844,7 @@ namespace BetterResearchMenu
                 oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier ||
                 oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
             {
+                BetterResearchMenuMod.instance.WriteSettings();
                 if (oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
                 {
                     PreOpen();
