@@ -32,6 +32,8 @@ namespace BetterResearchMenu
 
         public bool isPhantom;
         public TechLevel phantomEra;
+        public bool isGroupNode;
+        public GroupNodeDef groupNodeDef;
         public bool isFoundation;
         public bool isEmergence;
 
@@ -78,6 +80,7 @@ namespace BetterResearchMenu
     {
         public ResearchNode from;
         public ResearchNode to;
+        public bool isGroupEdge;
     }
 
     [HotSwappable]
@@ -217,6 +220,7 @@ namespace BetterResearchMenu
             BetterResearchMenuMod.settings.enableTechAdvancement;
 
         private string GetCacheKey(ResearchNode node) =>
+            node.isGroupNode ? $"group_{node.groupNodeDef.defName}_{(int)currentEra}" :
             node.isPhantom ? $"phantom_{(int)node.phantomEra}_{(int)currentEra}" : GetCacheKey(node.def);
 
         private string GetCacheKey(ResearchProjectDef def) => $"{def.defName}_{currentEra}";
@@ -530,18 +534,63 @@ namespace BetterResearchMenu
                 }
             }
 
+            {
+                int preGroupCount = nodes.Count;
+                var groupNodeByDef = new Dictionary<GroupNodeDef, ResearchNode>();
+                for (int gi = 0; gi < preGroupCount; gi++)
+                {
+                    var node = nodes[gi];
+                    if (node.isPhantom || node.isGroupNode || node.def == null) continue;
+                    var ext = node.def.GetModExtension<GroupParentExtension>();
+                    if (ext?.groupNode == null) continue;
+                    var gDef = ext.groupNode;
+                    if (gDef.tab != null && gDef.tab != CurTab) continue;
+
+                    if (!groupNodeByDef.TryGetValue(gDef, out var groupNode))
+                    {
+                        groupNode = new ResearchNode
+                        {
+                            isGroupNode = true,
+                            groupNodeDef = gDef,
+                            state = NodeState.Minimized,
+                        };
+                        groupNode.cachedKey = $"group_{gDef.defName}_{(int)currentEra}";
+                        groupNode.pos = State.nodePositions.TryGetValue(groupNode.cachedKey, out var savedGroupPos)
+                            ? savedGroupPos
+                            : new Vector2(Rand.Range(-150f, 150f), Rand.Range(-150f, 150f));
+                        groupNode.drawPos = groupNode.pos;
+                        groupNodeByDef[gDef] = groupNode;
+                        nodes.Add(groupNode);
+                        groupNode.nodeIndex = nodes.Count - 1;
+                    }
+
+                    var gEdge = new ResearchEdge { from = groupNode, to = node, isGroupEdge = true };
+                    edges.Add(gEdge);
+                    groupNode.nodeEdges.Add(gEdge);
+                    node.nodeEdges.Add(gEdge);
+                    groupNode.edgeCount++;
+                    groupNode.childCount++;
+                    node.edgeCount++;
+                    groupNode.connectedNodes.Add(node);
+                    node.connectedNodes.Add(groupNode);
+                    node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
+                }
+                foreach (var gn in groupNodeByDef.Values)
+                    gn.cachedMass = 1f + Mathf.Pow(gn.edgeCount, 1.2f) * 0.5f;
+            }
+
             var anchor = nodes.FirstOrDefault(n => n.isPhantom);
 
             if (anchor == null)
             {
-                anchor = nodes.Where(n => !n.isPhantom && n.def.IsFinished)
+                anchor = nodes.Where(n => !n.isPhantom && !n.isGroupNode && n.def.IsFinished)
                               .OrderBy(n => n.def.prerequisites?.Count ?? 0)
                               .FirstOrDefault();
             }
 
             if (anchor == null)
             {
-                anchor = nodes.Where(n => !n.isPhantom)
+                anchor = nodes.Where(n => !n.isPhantom && !n.isGroupNode)
                               .OrderBy(n => n.def.prerequisites?.Count ?? 0)
                               .FirstOrDefault();
             }
@@ -600,7 +649,7 @@ namespace BetterResearchMenu
                 foundations[i].pos = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * foundationRadius;
             }
 
-            var nodeSet = new HashSet<ResearchNode>(nodes.Where(n => !n.isPhantom));
+            var nodeSet = new HashSet<ResearchNode>(nodes.Where(n => !n.isPhantom && !n.isGroupNode));
             var placed = new HashSet<ResearchNode>();
             var pendingParentCount = new Dictionary<ResearchNode, int>();
 
@@ -766,7 +815,7 @@ namespace BetterResearchMenu
                 lastStateCheckHash = currentStateHash;
                 foreach (var node in nodes)
                 {
-                    if (node.isPhantom) continue;
+                    if (node.isPhantom || node.isGroupNode) continue;
                     node.isFinishedCache = node.def.IsFinished;
                     node.canStartNowCache = node.def.CanStartNow;
                     node.isLockedCache = !node.canStartNowCache && !node.isFinishedCache;
@@ -911,7 +960,7 @@ namespace BetterResearchMenu
                     float dist = dir.magnitude;
                     if (dist < 10f) continue;
 
-                    float k_att = 200f * BetterResearchMenuMod.settings.contractingForceMultiplier;
+                    const float k_att = 200f;
                     float attMul = 1f;
 
                     if (isCollapsed)
@@ -920,14 +969,16 @@ namespace BetterResearchMenu
                         attMul = isParentEdge ? 30f : 6f;
                     }
 
-                    attraction += (dir / dist) * (dist * dist / k_att) * attMul;
+                    attraction += (dir / dist) * (dist * dist / k_att) * attMul * BetterResearchMenuMod.settings.contractingForceMultiplier;
                 }
 
-                Vector2 totalForce = repulsion + attraction;
+                float isolationFactor = Mathf.Exp(-node.edgeCount * 0.4f);
+                Vector2 centerForce = -node.pos * 1.5f * BetterResearchMenuMod.settings.centerForceMultiplier * isolationFactor;
+                Vector2 totalForce = repulsion + attraction + centerForce;
 
                 node.lastRepulsionForce = repulsion;
                 node.lastAttractionForce = attraction;
-                node.lastCenterForce = Vector2.zero;
+                node.lastCenterForce = centerForce;
 
                 node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
                 velocitySum += node.velocity.sqrMagnitude;
@@ -961,7 +1012,7 @@ namespace BetterResearchMenu
             if (ignoreSettings) physicsTemperature *= 0.985f;
             else
             {
-                physicsTemperature *= 0.9f;
+                physicsTemperature *= 0.997f;
                 if (isPanning || wasDraggingNode || hasSignificantDrag)
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
             }
@@ -1026,7 +1077,8 @@ namespace BetterResearchMenu
             bool searchActive = quickSearchWidget.filter.Active;
             foreach (var node in nodes)
             {
-                node.matchesSearchCache = node.isPhantom || !searchActive || matchingProjects.Contains(node.def);
+                node.matchesSearchCache = node.isPhantom || node.isGroupNode || !searchActive
+                    || (node.def != null && matchingProjects.Contains(node.def));
             }
 
             HandleInputs(graphRect, controlAreaRect, panelRect, searchBarRect, inRect);
@@ -1050,6 +1102,7 @@ namespace BetterResearchMenu
                 {
                     var node = nodes[i];
                     if (node.state == NodeState.Hidden) continue;
+                    if (node.isPhantom || node.isGroupNode) continue;
                     if (!node.matchesSearchCache) continue;
                     var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
 
@@ -1236,16 +1289,26 @@ namespace BetterResearchMenu
                     continue;
                 if (!edge.from.matchesSearchCache || !edge.to.matchesSearchCache) continue;
 
-                var isFinished = !edge.from.isPhantom && edge.from.isFinishedCache;
-                var color = isFinished ? ColorEdgeFinished : ColorEdgeUnfinished;
+                Color edgeColor;
+                float edgeThickness;
+                if (edge.isGroupEdge)
+                {
+                    edgeColor = new Color(0.65f, 0.65f, 0.45f, 0.35f);
+                    edgeThickness = 1f * zoom;
+                }
+                else
+                {
+                    var isFinished = !edge.from.isPhantom && edge.from.isFinishedCache;
+                    edgeColor = isFinished ? ColorEdgeFinished : ColorEdgeUnfinished;
+                    edgeThickness = (isFinished ? ThicknessFinished : ThicknessUnfinished) * zoom;
+                }
 
                 Vector2 fromPos = WorldToScreen(edge.from.drawPos);
                 Vector2 toPos = WorldToScreen(edge.to.drawPos);
                 Rect edgeBounds = new Rect(Mathf.Min(fromPos.x, toPos.x), Mathf.Min(fromPos.y, toPos.y), Mathf.Abs(fromPos.x - toPos.x), Mathf.Abs(fromPos.y - toPos.y));
                 if (!viewPort.Overlaps(edgeBounds)) continue;
 
-                float thickness = (isFinished ? ThicknessFinished : ThicknessUnfinished) * zoom;
-                Widgets.DrawLine(fromPos, toPos, color, thickness);
+                Widgets.DrawLine(fromPos, toPos, edgeColor, edgeThickness);
             }
 
             foreach (var node in nodes)
@@ -1255,6 +1318,28 @@ namespace BetterResearchMenu
                 if (!node.matchesSearchCache) continue;
                 Vector2 screenPos = WorldToScreen(node.drawPos);
                 if (!viewPort.Contains(screenPos)) continue;
+
+                if (node.isGroupNode)
+                {
+                    var gSize = NodeSizeMinimized * zoom;
+                    var gRect = new Rect(screenPos.x - gSize / 2f, screenPos.y - gSize / 2f, gSize, gSize);
+                    GUI.color = new Color(0.75f, 0.75f, 0.5f, 0.75f);
+                    GUI.DrawTexture(gRect, TexBubble);
+                    GUI.color = Color.white;
+                    var gTex = node.groupNodeDef.GetTexture();
+                    if (gTex != null)
+                        GUI.DrawTexture(gRect.ContractedBy(6f * zoom), gTex);
+                    if (zoom > 0.4f)
+                    {
+                        Text.Anchor = TextAnchor.UpperCenter;
+                        Text.Font = GameFont.Tiny;
+                        float lw = 150f * zoom;
+                        Widgets.Label(new Rect(screenPos.x - lw / 2f, screenPos.y + gSize / 2f + 2f * zoom, lw, 40f * zoom),
+                            node.groupNodeDef.LabelCap);
+                        Text.Anchor = TextAnchor.UpperLeft;
+                    }
+                    continue;
+                }
 
                 if (node.isPhantom)
                 {

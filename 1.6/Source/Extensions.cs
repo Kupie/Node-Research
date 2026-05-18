@@ -1,4 +1,5 @@
 using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace BetterResearchMenu
@@ -16,6 +17,26 @@ namespace BetterResearchMenu
     public class EmergenceExtension : DefModExtension
     {
         public TechLevel targetLevel;
+    }
+
+    public class GroupParentExtension : DefModExtension
+    {
+        public GroupNodeDef groupNode;
+    }
+
+    public class GroupNodeDef : Def
+    {
+        public string texPath;
+        public ResearchTabDef tab;
+        public TechLevel techLevel = TechLevel.Undefined;
+
+        private Texture2D resolvedTex;
+        public Texture2D GetTexture()
+        {
+            if (resolvedTex == null && !texPath.NullOrEmpty())
+                resolvedTex = ContentFinder<Texture2D>.Get(texPath, false);
+            return resolvedTex;
+        }
     }
 
     public static class Extensions
