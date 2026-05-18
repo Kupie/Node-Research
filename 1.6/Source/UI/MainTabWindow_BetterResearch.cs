@@ -397,12 +397,6 @@ namespace BetterResearchMenu
                 if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && def.techLevel != currentEra) continue;
                 if (!GodModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
 
-                if (def.defName.StartsWith("StressTest_"))
-                {
-                    int.TryParse(def.defName.Split('_')[1], out int nodeIndex);
-                    if (nodeIndex >= BetterResearchMenuMod.settings.stressTestCount) continue;
-                }
-
                 var node = new ResearchNode { def = def };
                 node.isFoundation = def.IsFoundation();
                 node.isEmergence = def.HasModExtension<EmergenceExtension>();
@@ -1871,7 +1865,6 @@ namespace BetterResearchMenu
             float oldGrav = BetterResearchMenuMod.settings.centerForceMultiplier;
             float oldSpace = BetterResearchMenuMod.settings.spacingForceMultiplier;
             float oldCont = BetterResearchMenuMod.settings.contractingForceMultiplier;
-            int oldStressTest = BetterResearchMenuMod.settings.stressTestCount;
 
             float sliderHeight = 22f;
             float verticalSpacing = 6f;
@@ -1892,27 +1885,12 @@ namespace BetterResearchMenu
             GUI.DrawTexture(new Rect(contractingRect.x - 24f, contractingRect.y + 1f, iconSize, iconSize), TexContracting);
             BetterResearchMenuMod.settings.contractingForceMultiplier = Widgets.HorizontalSlider(contractingRect, BetterResearchMenuMod.settings.contractingForceMultiplier, 0.1f, 5.0f, true);
 
-            Text.Font = GameFont.Tiny;
-            Widgets.Label(new Rect(stressTestRect.x, stressTestRect.y - 10f, stressTestRect.width, 20f), "Stress Test Nodes: " + BetterResearchMenuMod.settings.stressTestCount);
-            Text.Font = GameFont.Small;
-            int currentStressTestCount = BetterResearchMenuMod.settings.stressTestCount;
-            var newStressTestCount = Widgets.HorizontalSlider(stressTestRect, currentStressTestCount, 0f, 600f, true);
-            BetterResearchMenuMod.settings.stressTestCount = (int)newStressTestCount;
-
             if (oldGrav != BetterResearchMenuMod.settings.centerForceMultiplier ||
                 oldSpace != BetterResearchMenuMod.settings.spacingForceMultiplier ||
-                oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier ||
-                oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
+                oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier)
             {
                 BetterResearchMenuMod.instance.WriteSettings();
-                if (oldStressTest != BetterResearchMenuMod.settings.stressTestCount)
-                {
-                    PreOpen();
-                }
-                else
-                {
-                    physicsTemperature = Mathf.Max(physicsTemperature, 100f);
-                }
+                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
         }
 
