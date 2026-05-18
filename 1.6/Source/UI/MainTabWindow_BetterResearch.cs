@@ -349,20 +349,9 @@ namespace BetterResearchMenu
             if (node == null) return;
             node.state = NodeState.Minimized;
             State.nodeStates[node.def.defName] = node.state;
+            node.velocity = Vector2.zero;
 
             physicsTemperature = Mathf.Max(physicsTemperature, 100f);
-
-            Vector2 impulse = Vector2.zero;
-            int parentCount = 0;
-            foreach (var edge in edges)
-            {
-                if (edge.to == node && edge.from.state != NodeState.Hidden)
-                {
-                    impulse += (edge.from.pos - node.pos).normalized;
-                    parentCount++;
-                }
-            }
-            if (parentCount > 0) node.velocity += (impulse / parentCount) * 800f;
             DefsOf.BRM_CollapsingNode.PlayOneShotOnCamera();
         }
 
@@ -715,14 +704,14 @@ namespace BetterResearchMenu
         {
             physicsTemperature = 100f;
             var activeCount = nodes.Count(n => n.state != NodeState.Hidden);
-            var loop = 0;
-            for (var i = 0; i < 2000; i++)
+            if (activeCount == 0) return;
+
+            for (var i = 0; i < 5000; i++)
             {
-                PhysicsTick(0.02f, true);
-                loop = i;
-                if (activeCount > 0 && velocitySum / activeCount < 0.001f) break;
+                PhysicsTick(0.04f, true);
+                if (velocitySum / activeCount < 0.000001f && i > 1000) break;
             }
-            Log.Message(currentEra.ToStringHuman() + " - end of loop: " + loop);
+
             foreach (var node in nodes)
             {
                 node.velocity = Vector2.zero;
@@ -888,6 +877,8 @@ namespace BetterResearchMenu
                 Vector2 repulsion = Vector2.zero;
                 Vector2 attraction = Vector2.zero;
 
+                bool isCollapsed = node.state == NodeState.Dot || node.state == NodeState.Minimized;
+
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
                     if (ni == oi) continue;
@@ -904,6 +895,10 @@ namespace BetterResearchMenu
                     float forceMag = (k * k / dist) * 0.2f * weight;
                     if (node.connectedNodes.Contains(other)) forceMag *= 0.4f;
 
+                    bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
+                    if (isCollapsed && !otherIsCollapsed) forceMag *= 0.15f;
+                    else if (isCollapsed && otherIsCollapsed) forceMag *= 2.0f;
+
                     repulsion += (dir / dist) * forceMag;
                 }
 
@@ -917,7 +912,15 @@ namespace BetterResearchMenu
                     if (dist < 10f) continue;
 
                     float k_att = 200f * BetterResearchMenuMod.settings.contractingForceMultiplier;
-                    attraction += (dir / dist) * (dist * dist / k_att);
+                    float attMul = 1f;
+
+                    if (isCollapsed)
+                    {
+                        bool isParentEdge = edge.to == node;
+                        attMul = isParentEdge ? 30f : 6f;
+                    }
+
+                    attraction += (dir / dist) * (dist * dist / k_att) * attMul;
                 }
 
                 Vector2 totalForce = repulsion + attraction;
@@ -964,21 +967,21 @@ namespace BetterResearchMenu
             }
 
             if (debugLogNextTick)
-        {
-            debugLogNextTick = false;
-            var topMovers = nodes
-                .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
-                .OrderByDescending(n => n.velocity.sqrMagnitude)
-                .Take(3)
-                .ToList();
-            foreach (var n in topMovers)
             {
-                Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
-                    $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
+                debugLogNextTick = false;
+                var topMovers = nodes
+                    .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
+                    .OrderByDescending(n => n.velocity.sqrMagnitude)
+                    .Take(3)
+                    .ToList();
+                foreach (var n in topMovers)
+                {
+                    Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
+                        $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
+                }
+                Log.Message($"[BRM PostReheat] tickCount={physicsTickCount}, velocitySum={velocitySum:F6}");
             }
-            Log.Message($"[BRM PostReheat] velocitySum={velocitySum:F6}, activeNodes={activeNodeCount}");
         }
-    }
 
         private float velocitySum = 0f;
         private HashSet<(ResearchNode, ResearchNode)> phantomEdgeSet = new HashSet<(ResearchNode, ResearchNode)>();
@@ -1163,10 +1166,18 @@ namespace BetterResearchMenu
                                 var visibleChildren = selectedNode.nodeEdges.Where(e => e.from == selectedNode && e.to.state != NodeState.Hidden).Select(e => e.to).ToList();
                                 for (int i = 0; i < visibleChildren.Count; i++)
                                 {
-                                    float angle = ((float)i / visibleChildren.Count) * Mathf.PI * 2f;
-                                    var outDir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-                                    visibleChildren[i].pos = selectedNode.pos + outDir * 10f;
-                                    visibleChildren[i].velocity += outDir * 1500f;
+                                    var child = visibleChildren[i];
+                                    var outDir = (child.pos - selectedNode.pos);
+                                    if (outDir.sqrMagnitude < 0.01f)
+                                    {
+                                        float angle = ((float)i / visibleChildren.Count) * Mathf.PI * 2f;
+                                        outDir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                                    }
+                                    else
+                                    {
+                                        outDir = outDir.normalized;
+                                    }
+                                    child.velocity += outDir * 300f;
                                 }
                             }
                         }
