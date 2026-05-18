@@ -162,8 +162,8 @@ namespace BetterResearchMenu
         private float ThicknessUnfinished = 2f;
         private float IconPadding = 12f;
         private float physicsTemperature = 0f;
+        private float lastForceAverage = 0f;
         private bool debugLogNextTick = false;
-        private int physicsTickCount = 0;
         private bool isPanning;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
@@ -745,22 +745,28 @@ namespace BetterResearchMenu
 
         private void InitPhysicsLayout()
         {
-            physicsTemperature = 100f;
+            physicsTemperature = 200f;
             var activeCount = nodes.Count(n => n.state != NodeState.Hidden);
             if (activeCount == 0) return;
 
             for (var i = 0; i < 5000; i++)
             {
                 PhysicsTick(0.04f, true);
-                if (velocitySum / activeCount < 0.000001f && i > 1000) break;
+
+                if (i > 200 && lastForceAverage < 0.00001f)
+                {
+                    Log.Message($"[BetterResearchMenu] Layout physically balanced at iteration {i}");
+                    break;
+                }
             }
 
+            physicsTemperature = 0f;
+            velocitySum = 0f;
             foreach (var node in nodes)
             {
                 node.velocity = Vector2.zero;
                 node.drawPos = node.pos;
-                if (!node.isPhantom && !node.isAnchor)
-                    State.nodePositions[node.cachedKey] = node.pos;
+                if (!node.isPhantom) State.nodePositions[node.cachedKey] = node.pos;
             }
         }
 
@@ -900,28 +906,22 @@ namespace BetterResearchMenu
         private void PhysicsTick(float dt, bool ignoreSettings = false)
         {
             if (!BetterResearchMenuMod.settings.physicsEnabled && !ignoreSettings) { physicsTemperature = 0f; return; }
-            if (physicsTemperature < 0.01f) { physicsTemperature = 0f; velocitySum = 0f; return; }
-            physicsTickCount++;
+            if (physicsTemperature < 0.01f) { physicsTemperature = 0f; return; }
 
-            velocitySum = 0f;
             int nodeCount = nodes.Count;
-            int activeNodeCount = 0;
+            float currentForceSum = 0f;
+            int activeCount = 0;
 
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom)
-                {
-                    node.velocity = Vector2.zero;
-                    continue;
-                }
+                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
+                activeCount++;
 
-                activeNodeCount++;
                 Vector2 repulsion = Vector2.zero;
                 Vector2 attraction = Vector2.zero;
 
-                bool isCollapsed = node.state == NodeState.Dot || node.state == NodeState.Minimized;
-
+                float k_rep = 200f * BetterResearchMenuMod.settings.spacingForceMultiplier;
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
                     if (ni == oi) continue;
@@ -931,82 +931,44 @@ namespace BetterResearchMenu
                     Vector2 dir = node.pos - other.pos;
                     float dist = dir.magnitude;
                     if (dist < 1f) { dir = Rand.UnitVector2; dist = 1f; }
-
-                    float k = 500f * BetterResearchMenuMod.settings.spacingForceMultiplier;
-                    float weight = (1f + Mathf.Sqrt(node.childCount) * 0.5f) * (1f + Mathf.Sqrt(other.childCount) * 0.5f);
-
-                    float forceMag = (k * k / dist) * 0.2f * weight;
-                    if (node.connectedNodes.Contains(other)) forceMag *= 0.4f;
-
-                    bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
-                    if (isCollapsed && !otherIsCollapsed) forceMag *= 0.15f;
-                    else if (isCollapsed && otherIsCollapsed) forceMag *= 2.0f;
-
-                    repulsion += (dir / dist) * forceMag;
+                    repulsion += (dir / dist) * ((k_rep * k_rep) / dist);
                 }
 
+                float k_att = 250f;
                 foreach (var edge in node.nodeEdges)
                 {
                     var other = (edge.from == node) ? edge.to : edge.from;
                     if (other.state == NodeState.Hidden) continue;
-
                     Vector2 dir = other.pos - node.pos;
                     float dist = dir.magnitude;
                     if (dist < 10f) continue;
-
-                    const float k_att = 200f;
-                    float attMul = 1f;
-
-                    if (isCollapsed)
-                    {
-                        bool isParentEdge = edge.to == node;
-                        attMul = isParentEdge ? 30f : 6f;
-                    }
-
-                    attraction += (dir / dist) * (dist * dist / k_att) * attMul * BetterResearchMenuMod.settings.contractingForceMultiplier;
+                    attraction += (dir / dist) * (dist * dist / k_att) * BetterResearchMenuMod.settings.contractingForceMultiplier;
                 }
 
-                float isolationFactor = Mathf.Exp(-node.edgeCount * 0.4f);
-                Vector2 centerForce = -node.pos * 1.5f * BetterResearchMenuMod.settings.centerForceMultiplier * isolationFactor;
-                Vector2 totalForce = repulsion + attraction + centerForce;
+                Vector2 centerForce = -node.pos * 1.5f * BetterResearchMenuMod.settings.centerForceMultiplier;
 
                 node.lastRepulsionForce = repulsion;
                 node.lastAttractionForce = attraction;
                 node.lastCenterForce = centerForce;
 
-                node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
-                velocitySum += node.velocity.sqrMagnitude;
+                Vector2 netForce = (repulsion + attraction + centerForce) * 0.02f;
+                node.velocity = (node.velocity + (netForce / node.cachedMass)) * 0.5f;
+
+                float speed = node.velocity.magnitude;
+                if (speed > physicsTemperature)
+                    node.velocity *= (physicsTemperature / speed);
+
+                node.pos += node.velocity;
+                currentForceSum += node.velocity.sqrMagnitude;
             }
 
-            Vector2 netMovement = Vector2.zero;
-            int movedCount = 0;
+            velocitySum = currentForceSum;
+            lastForceAverage = activeCount > 0 ? currentForceSum / activeCount : 0f;
 
-            foreach (var node in nodes)
-            {
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
-
-                Vector2 move = node.velocity * dt * 8f;
-                node.pos += move;
-                netMovement += move;
-                movedCount++;
-
-                if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
-            }
-
-            if (movedCount > 0)
-            {
-                Vector2 drift = netMovement / movedCount;
-                foreach (var node in nodes)
-                {
-                    if (node.state != NodeState.Hidden && !node.isDragging)
-                        node.pos -= drift;
-                }
-            }
-
-            if (ignoreSettings) physicsTemperature *= 0.985f;
+            if (ignoreSettings) physicsTemperature *= 0.992f;
             else
             {
-                physicsTemperature *= 0.997f;
+                physicsTemperature *= 0.95f;
                 if (isPanning || wasDraggingNode || hasSignificantDrag)
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
             }
@@ -1024,7 +986,7 @@ namespace BetterResearchMenu
                     Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
                         $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
                 }
-                Log.Message($"[BRM PostReheat] tickCount={physicsTickCount}, velocitySum={velocitySum:F6}");
+                Log.Message($"[BRM PostReheat] physicsTemperature={physicsTemperature:F4}, velocitySum={velocitySum:F6}, lastForceAverage={lastForceAverage:F8}");
             }
         }
 
