@@ -52,7 +52,7 @@ namespace BetterResearchMenu
         public float cachedTitleHeight_Medium;
         public float lastCachedZoom = -1f;
 
-        public float RadiusMultiplier => this.isFoundation ? 1.5f : 1.0f;
+        public float RadiusMultiplier => (this.isFoundation || this.isEmergence) ? 1.95f : 1.0f;
         public float SpacingMultiplier => (state == NodeState.Dot || state == NodeState.Minimized) ? 0.5f : 1.0f;
 
         public float GetCachedTitleHeight(GameFont font, float labelWidth, float zoom)
@@ -74,8 +74,8 @@ namespace BetterResearchMenu
 
         public float GetNodeSize(float baseSize, NodeState currentState)
         {
-            if (!this.isFoundation) return baseSize;
-            return currentState == NodeState.Minimized ? baseSize * 1.875f : baseSize * 1.75f;
+            if (!this.isFoundation && !this.isEmergence) return baseSize;
+            return currentState == NodeState.Minimized ? baseSize * 2.4375f : baseSize * 2.275f;
         }
     }
     public class ResearchEdge
@@ -689,7 +689,7 @@ namespace BetterResearchMenu
             var foundations = nodes.Where(n => n.isFoundation && !n.isPhantom).ToList();
             if (foundations.Count == 0) return;
 
-            float foundationRadius = 700f * Mathf.Sqrt(Mathf.Max(1, foundations.Count));
+            float foundationRadius = 910f * Mathf.Sqrt(Mathf.Max(1, foundations.Count));
             for (int i = 0; i < foundations.Count; i++)
             {
                 float angle = (float)i / foundations.Count * Mathf.PI * 2f;
@@ -728,7 +728,8 @@ namespace BetterResearchMenu
                     int parentCount = 0;
                     foreach (var ce in child.nodeEdges)
                     {
-                        if (ce.to != child) continue;
+                        if (godModeStateSnapshot != null)
+                            if (ce.to != child) continue;
                         if (!placed.Contains(ce.from)) continue;
                         parentCentroid += ce.from.pos;
                         parentCount++;
@@ -937,6 +938,37 @@ namespace BetterResearchMenu
             }
             else
             {
+                bool hasAccessToTab = true;
+                if (CurTab == DefsOf.Anomaly)
+                {
+                    hasAccessToTab = DefsOf.Anomaly != null && Find.Anomaly.HighestLevelReached > 0;
+                }
+                else if (CurTab == DefsOf.VGE_Gravtech)
+                {
+                    hasAccessToTab = DefsOf.VGE_Gravtech != null && DefsOf.BasicGravtech.IsFinished;
+                }
+
+                bool hasAccessToEra = true;
+                if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && BetterResearchMenuMod.settings.restrictResearchToTechLevel)
+                {
+                    if (currentEra > Faction.OfPlayer.def.techLevel)
+                    {
+                        hasAccessToEra = false;
+                    }
+                }
+
+                if (!hasAccessToTab || !hasAccessToEra)
+                {
+                    CurTab = DefsOf.Main;
+                    lastCurTab = DefsOf.Main;
+                    currentEra = TechLevel.Undefined;
+                    selectionLocked = false;
+                    selectedNode = null;
+                    selectedProject = null;
+                    zoom = 1f;
+                    anyChanged = true;
+                }
+
                 if (godModeStateSnapshot != null)
                 {
                     foreach (var def in DefDatabase<ResearchProjectDef>.AllDefsListForReading)
@@ -987,8 +1019,16 @@ namespace BetterResearchMenu
                 var n = nodes[i];
                 bool coll = n.state == NodeState.Dot || n.state == NodeState.Minimized;
                 if (n.isGroupNode) n.collisionRadius = 25f;
-                else if (coll) n.collisionRadius = (n.isFoundation || n.isEmergence) ? 40f : 20f;
-                else n.collisionRadius = (n.isFoundation || n.isEmergence) ? 80f : 40f;
+                else if (coll)
+                {
+                    if (n.isFoundation || n.isEmergence) n.collisionRadius = 52f;
+                    else n.collisionRadius = 20f;
+                }
+                else
+                {
+                    if (n.isFoundation || n.isEmergence) n.collisionRadius = 104f;
+                    else n.collisionRadius = 40f;
+                }
             }
 
             for (int ni = 0; ni < nodeCount; ni++)
@@ -1227,7 +1267,7 @@ namespace BetterResearchMenu
                     }
                     else
                     {
-                        nodeSize = (isFoundation || isEmergence ? NodeSizeExpanded * 2f : NodeSizeExpanded) * zoom;
+                        nodeSize = ((isFoundation || isEmergence) ? NodeSizeExpanded * 2.6f : NodeSizeExpanded) * zoom;
                     }
 
                     if (Vector2.Distance(screenPos, localMousePos) < nodeSize / 2f)
@@ -1521,7 +1561,7 @@ namespace BetterResearchMenu
                     continue;
                 }
 
-                var nodeSize = (isFoundation || isEmergence ? NodeSizeExpanded * 2f : NodeSizeExpanded) * zoom;
+                var nodeSize = ((isFoundation || isEmergence) ? NodeSizeExpanded * 2.6f : NodeSizeExpanded) * zoom;
                 var nodeRect = new Rect(screenPos.x - nodeSize / 2f, screenPos.y - nodeSize / 2f, nodeSize, nodeSize);
 
                 if (node == selectedNode)
@@ -1532,7 +1572,7 @@ namespace BetterResearchMenu
                 }
                 if (node.isPhantom is false)
                     State.openedNodes.Add(node.def.defName);
-                var padding = (isFoundation || isEmergence) ? IconPadding * 2f : IconPadding;
+                var padding = (isFoundation || isEmergence) ? IconPadding * 3f : IconPadding;
                 bool isSilhouetted = !node.isFinishedCache;
                 DrawBubble(nodeRect, node.def, padding * zoom, activeProjects, drawSilhouette: isSilhouetted);
 
@@ -1542,7 +1582,7 @@ namespace BetterResearchMenu
                     Text.Font = zoom < 0.6f ? GameFont.Tiny : (zoom > 1.2f ? GameFont.Medium : GameFont.Small);
 
                     float labelWidth = 200f * zoom;
-                    float unscaledNodeSize = isFoundation || isEmergence ? NodeSizeExpanded * 2f : NodeSizeExpanded;
+                    float unscaledNodeSize = (isFoundation || isEmergence) ? NodeSizeExpanded * 2.6f : NodeSizeExpanded;
                     Rect labelRect = new Rect(screenPos.x - (labelWidth / 2f), screenPos.y + (unscaledNodeSize * zoom / 2f) + 5f * zoom, labelWidth, 200f * zoom);
 
                     Widgets.Label(labelRect, node.def.LabelCap);
