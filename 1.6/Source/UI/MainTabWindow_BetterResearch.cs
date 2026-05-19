@@ -26,6 +26,7 @@ namespace BetterResearchMenu
         public string cachedKey;
         public float cachedMass;
         public float cachedWeight;
+        public float collisionRadius;
 
         public Vector2 lastRepulsionForce;
         public Vector2 lastAttractionForce;
@@ -985,6 +986,18 @@ namespace BetterResearchMenu
             float contForce = BetterResearchMenuMod.settings.contractingForceMultiplier;
             float centerForceMul = BetterResearchMenuMod.settings.centerForceMultiplier;
 
+            float graphRadiusBound = Mathf.Max(300f, Mathf.Sqrt(nodeCount) * 120f);
+            float dynamicHubBuffer = Mathf.Clamp(12000f / Mathf.Max(1, nodeCount), 150f, 600f);
+
+            for (int i = 0; i < nodeCount; i++)
+            {
+                var n = nodes[i];
+                bool coll = n.state == NodeState.Dot || n.state == NodeState.Minimized;
+                if (n.isGroupNode) n.collisionRadius = 25f;
+                else if (coll) n.collisionRadius = (n.isFoundation || n.isEmergence) ? 40f : 20f;
+                else n.collisionRadius = (n.isFoundation || n.isEmergence) ? 80f : 40f;
+            }
+
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
@@ -1007,6 +1020,7 @@ namespace BetterResearchMenu
 
                 bool isCollapsed = node.state == NodeState.Dot || node.state == NodeState.Minimized;
                 float nodeWeight = node.cachedWeight;
+                float nodeRadius = node.collisionRadius;
 
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
@@ -1029,12 +1043,30 @@ namespace BetterResearchMenu
 
                     if (adjacencyMatrix[ni, oi]) forceMagSq *= 0.4f;
 
+                    bool nodeIsHub = node.isFoundation || node.isGroupNode;
+                    bool otherIsHub = other.isFoundation || other.isGroupNode;
+
+                    if (nodeIsHub && otherIsHub)
+                    {
+
+                        forceMagSq *= 25.0f;
+                    }
+
                     bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
                     float collapseRepulsionMul = 1f;
                     if (isCollapsed && otherIsCollapsed) collapseRepulsionMul = 2.0f;
                     else if (isCollapsed || otherIsCollapsed) collapseRepulsionMul = 0.15f;
 
                     forceMagSq *= collapseRepulsionMul;
+
+                    float buffer = (nodeIsHub && otherIsHub) ? dynamicHubBuffer : 20f;
+                    float minDist = nodeRadius + other.collisionRadius + buffer;
+                    float minDistSq = minDist * minDist;
+                    if (distSq < minDistSq)
+                    {
+                        float dist = Mathf.Sqrt(distSq);
+                        forceMagSq += (minDist - dist) * 2000f / dist;
+                    }
 
                     repX += dx * forceMagSq;
                     repY += dy * forceMagSq;
@@ -1069,8 +1101,10 @@ namespace BetterResearchMenu
                     attraction.y += dy * mul;
                 }
 
-                float isolationFactor = Mathf.Exp(-node.edgeCount * 0.4f);
-                Vector2 centerForce = new Vector2(-nx, -ny) * 1.5f * centerForceMul * isolationFactor;
+                float distToCenter = Mathf.Sqrt(nx * nx + ny * ny);
+                float distanceMultiplier = 1f + Mathf.Pow(distToCenter / graphRadiusBound, 2f);
+                float isolationFactor = node.edgeCount == 0 ? 3.0f : Mathf.Exp(-node.edgeCount * 0.4f);
+                Vector2 centerForce = new Vector2(-nx, -ny) * 1.5f * centerForceMul * isolationFactor * distanceMultiplier;
 
                 Vector2 totalForce = repulsion + attraction + centerForce;
 
