@@ -315,7 +315,7 @@ namespace BetterResearchMenu
                     .Where(x => (techLevel == TechLevel.Undefined
                                 || x.techLevel == techLevel
                                 || (x.techLevel == TechLevel.Undefined && techLevel == Faction.OfPlayer.def.techLevel))
-                                && x.tab == CurTab)
+                                && x.tab == CurTab && !x.HasModExtension<EmergenceExtension>())
                     .ToList();
                 data = (all, all.Count(x => x.IsFinished));
                 topBarDataCache[techLevel] = data;
@@ -761,6 +761,9 @@ namespace BetterResearchMenu
         {
             if (!GodModeReveal)
             {
+                if (def.IsHidden)
+                    return NodeState.Hidden;
+
                 if (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel)
                     return NodeState.Hidden;
 
@@ -923,6 +926,7 @@ namespace BetterResearchMenu
                 {
                     if (def.tab != CurTab) continue;
                     bool wouldBeHidden =
+                        def.IsHidden ||
                         (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel) ||
                         (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) ||
                         def.HasModExtension<EmergenceExtension>();
@@ -941,6 +945,7 @@ namespace BetterResearchMenu
                     {
                         if (def.tab != CurTab) continue;
                         bool wouldBeHidden =
+                            def.IsHidden ||
                             (BetterResearchMenuMod.settings.restrictViewingFutureTechLevels && def.techLevel > Faction.OfPlayer.def.techLevel) ||
                             (BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) ||
                             def.HasModExtension<EmergenceExtension>();
@@ -1139,7 +1144,7 @@ namespace BetterResearchMenu
             if (ignoreSettings) physicsTemperature *= 0.995f;
             else
             {
-                physicsTemperature *= 0.96f;
+                physicsTemperature *= 0.98f;
                 if (wasDraggingNode || hasSignificantDrag)
                 {
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
@@ -1941,6 +1946,10 @@ namespace BetterResearchMenu
                         node.drawPos = node.pos;
                     }
                 }
+                else
+                {
+                    physicsTemperature = Mathf.Max(physicsTemperature, 100f);
+                }
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
             TooltipHandler.TipRegion(physicsBtnRect, "BRM_TogglePhysics".Translate());
@@ -1956,23 +1965,7 @@ namespace BetterResearchMenu
             }
             TooltipHandler.TipRegion(vanillaBtnRect, "BRM_OpenVanillaMenu".Translate());
 
-            var reheatBtnRect = new Rect(vanillaBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
-            if (Widgets.ButtonImage(reheatBtnRect, TexPhysics, Color.yellow))
-            {
-                float maxVel = 0f;
-                ResearchNode maxVelNode = null;
-                foreach (var n in nodes)
-                {
-                    float v = n.velocity.sqrMagnitude;
-                    if (v > maxVel) { maxVel = v; maxVelNode = n; }
-                }
-                Log.Message($"[BRM Reheat] physicsTemperature={physicsTemperature:F4}, velocitySum={velocitySum:F6}, maxNodeVelocity={Mathf.Sqrt(maxVel):F6} ({maxVelNode?.def?.defName ?? "null"})");
-                physicsTemperature = 100f;
-                SoundDefOf.Click.PlayOneShotOnCamera();
-            }
-            TooltipHandler.TipRegion(reheatBtnRect, "Reheat (debug)");
-
-            var settingsBtnRect = new Rect(reheatBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
+            var settingsBtnRect = new Rect(vanillaBtnRect.xMax + ControlBtnGap, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
             if (Widgets.ButtonImage(settingsBtnRect, TexSettings))
             {
                 Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<BetterResearchMenuMod>()));
@@ -1992,7 +1985,6 @@ namespace BetterResearchMenu
             var gravityRect = new Rect(controlAreaRect.x + 25f, controlAreaRect.y + ControlBtnSize + verticalSpacing, sliderWidth, sliderHeight);
             var spacingRect = new Rect(controlAreaRect.x + 25f, gravityRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
             var contractingRect = new Rect(controlAreaRect.x + 25f, spacingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
-            var stressTestRect = new Rect(controlAreaRect.x + 25f, contractingRect.yMax + verticalSpacing, sliderWidth, sliderHeight);
 
             GUI.DrawTexture(new Rect(gravityRect.x - 24f, gravityRect.y + 1f, 16f, 16f), TexCenter);
             BetterResearchMenuMod.settings.centerForceMultiplier = Widgets.HorizontalSlider(gravityRect, BetterResearchMenuMod.settings.centerForceMultiplier, 0.1f, 5.0f, true);
