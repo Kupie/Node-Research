@@ -25,6 +25,7 @@ namespace BetterResearchMenu
         public int nodeIndex;
         public string cachedKey;
         public float cachedMass;
+        public float cachedWeight;
 
         public Vector2 lastRepulsionForce;
         public Vector2 lastAttractionForce;
@@ -102,6 +103,7 @@ namespace BetterResearchMenu
         private static Texture2D texGradient;
         public static Dictionary<TechLevel, Texture2D> TechLevelIcons = new Dictionary<TechLevel, Texture2D>
         {
+            { TechLevel.Undefined, ContentFinder<Texture2D>.Get("UI/TechLevels/AllTab") },
             { TechLevel.Animal, ContentFinder<Texture2D>.Get("UI/TechLevels/Animal") },
             { TechLevel.Neolithic, ContentFinder<Texture2D>.Get("UI/TechLevels/Neolithic") },
             { TechLevel.Medieval, ContentFinder<Texture2D>.Get("UI/TechLevels/Medieval") },
@@ -162,7 +164,8 @@ namespace BetterResearchMenu
         private float ThicknessUnfinished = 2f;
         private float IconPadding = 12f;
         private float physicsTemperature = 0f;
-        private bool debugLogNextTick = false;
+        private int fastForwardTicks = 0;
+        private bool[,] adjacencyMatrix;
         private bool continuousDebugLogging = true;
         private int debugLogTickCounter = 0;
         private bool isPanning;
@@ -351,7 +354,7 @@ namespace BetterResearchMenu
 
         private void CollapseNode(ResearchNode node)
         {
-            if (node == null) return;
+            if (node == null || node.isGroupNode || node.isPhantom) return;
             node.state = NodeState.Minimized;
             State.nodeStates[node.def.defName] = node.state;
             node.velocity = Vector2.zero;
@@ -506,7 +509,7 @@ namespace BetterResearchMenu
                     groupNode.connectedNodes.Add(node);
                     node.connectedNodes.Add(groupNode);
                 }
-                
+
                 foreach (var groupNode in groupNodeByDef.Values)
                 {
                     if (groupNode.groupNodeDef.prerequisites != null)
@@ -529,6 +532,18 @@ namespace BetterResearchMenu
                         }
                     }
                 }
+            }
+
+            foreach (var groupNode in nodes.Where(n => n.isGroupNode))
+            {
+                bool hasVisibleResearches = groupNode.nodeEdges.Any(e =>
+                {
+                    var other = (e.from == groupNode) ? e.to : e.from;
+                    return !other.isGroupNode && !other.isPhantom && other.state != NodeState.Hidden;
+                });
+
+                if (!hasVisibleResearches)
+                    groupNode.state = NodeState.Hidden;
             }
 
             if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined)
@@ -591,8 +606,19 @@ namespace BetterResearchMenu
                 }
             }
 
+            for (int i = 0; i < nodes.Count; i++) nodes[i].nodeIndex = i;
+            adjacencyMatrix = new bool[nodes.Count, nodes.Count];
+            foreach (var edge in edges)
+            {
+                adjacencyMatrix[edge.from.nodeIndex, edge.to.nodeIndex] = true;
+                adjacencyMatrix[edge.to.nodeIndex, edge.from.nodeIndex] = true;
+            }
+
             foreach (var node in nodes)
+            {
                 node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
+                node.cachedWeight = 1f + Mathf.Sqrt(node.childCount) * 0.5f;
+            }
 
             string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
             if (!seededLayoutKeys.Contains(layoutKey))
@@ -814,11 +840,11 @@ namespace BetterResearchMenu
                 OnGodModeChanged(currentGodMode);
             }
 
-            if (selectedProject != null && (selectedNode == null || selectedNode.def != selectedProject))
+            if (selectedProject != null && (selectedNode == null || selectedNode.isGroupNode || selectedNode.isPhantom || selectedNode.def != selectedProject))
             {
-                selectedNode = nodes.FirstOrDefault(n => !n.isPhantom && n.def == selectedProject);
+                selectedNode = nodes.FirstOrDefault(n => !n.isPhantom && !n.isGroupNode && n.def == selectedProject);
             }
-            else if (selectedNode != null && selectedProject != selectedNode.def)
+            else if (selectedNode != null && !selectedNode.isGroupNode && !selectedNode.isPhantom && selectedProject != selectedNode.def)
             {
                 selectedProject = selectedNode.def;
             }
@@ -855,7 +881,14 @@ namespace BetterResearchMenu
                 physicsTemperature = Mathf.Max(physicsTemperature, 100f);
             }
 
-            PhysicsTick(0.02f);
+            int ticksThisFrame = fastForwardTicks > 0 ? 30 : 1;
+            bool isFastForwarding = fastForwardTicks > 0;
+            if (fastForwardTicks > 0) fastForwardTicks--;
+
+            for (int i = 0; i < ticksThisFrame; i++)
+            {
+                PhysicsTick(0.02f, isFastForwarding);
+            }
 
             foreach (var node in nodes)
             {
@@ -925,7 +958,8 @@ namespace BetterResearchMenu
             if (anyChanged)
             {
                 InitPhysics(false);
-                physicsTemperature = Mathf.Max(physicsTemperature, 100f);
+                physicsTemperature = Mathf.Max(physicsTemperature, 200f);
+                fastForwardTicks = 60;
             }
         }
 
@@ -946,6 +980,11 @@ namespace BetterResearchMenu
 
             velocitySum = 0f;
             int nodeCount = nodes.Count;
+            float k_rep = 500f * BetterResearchMenuMod.settings.spacingForceMultiplier;
+            float baseRep = (k_rep * k_rep) * 0.2f;
+            float contForce = BetterResearchMenuMod.settings.contractingForceMultiplier;
+            float centerForceMul = BetterResearchMenuMod.settings.centerForceMultiplier;
+
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
@@ -961,9 +1000,13 @@ namespace BetterResearchMenu
                     node.velocity = Vector2.zero;
                 }
 
-                Vector2 repulsion = Vector2.zero;
-                Vector2 attraction = Vector2.zero;
+                float nx = node.pos.x;
+                float ny = node.pos.y;
+                float repX = 0f;
+                float repY = 0f;
+
                 bool isCollapsed = node.state == NodeState.Dot || node.state == NodeState.Minimized;
+                float nodeWeight = node.cachedWeight;
 
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
@@ -971,34 +1014,47 @@ namespace BetterResearchMenu
                     var other = nodes[oi];
                     if (other.state == NodeState.Hidden) continue;
 
-                    Vector2 dir = node.pos - other.pos;
-                    float dist = dir.magnitude;
-                    if (float.IsNaN(dist) || dist < 1f) { dir = Rand.UnitVector2; dist = 1f; }
+                    float dx = nx - other.pos.x;
+                    float dy = ny - other.pos.y;
+                    float distSq = dx * dx + dy * dy;
 
-                    float k = 500f * BetterResearchMenuMod.settings.spacingForceMultiplier;
-                    float weight = (1f + Mathf.Sqrt(node.childCount) * 0.5f) * (1f + Mathf.Sqrt(other.childCount) * 0.5f);
+                    if (distSq < 1f || float.IsNaN(distSq))
+                    {
+                        dx = Rand.Value - 0.5f;
+                        dy = Rand.Value - 0.5f;
+                        distSq = dx * dx + dy * dy;
+                    }
 
-                    float forceMag = (k * k / dist) * 0.2f * weight;
-                    if (node.connectedNodes.Contains(other)) forceMag *= 0.4f;
+                    float forceMagSq = baseRep * nodeWeight * other.cachedWeight / distSq;
+
+                    if (adjacencyMatrix[ni, oi]) forceMagSq *= 0.4f;
 
                     bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
-                    
                     float collapseRepulsionMul = 1f;
                     if (isCollapsed && otherIsCollapsed) collapseRepulsionMul = 2.0f;
                     else if (isCollapsed || otherIsCollapsed) collapseRepulsionMul = 0.15f;
-                    forceMag *= collapseRepulsionMul;
 
-                    repulsion += (dir / dist) * forceMag;
+                    forceMagSq *= collapseRepulsionMul;
+
+                    repX += dx * forceMagSq;
+                    repY += dy * forceMagSq;
                 }
+
+                Vector2 repulsion = new Vector2(repX, repY);
+                Vector2 attraction = Vector2.zero;
 
                 foreach (var edge in node.nodeEdges)
                 {
                     var other = (edge.from == node) ? edge.to : edge.from;
                     if (other.state == NodeState.Hidden) continue;
 
-                    Vector2 dir = other.pos - node.pos;
-                    float dist = dir.magnitude;
-                    if (float.IsNaN(dist) || dist < 10f) continue;
+                    float dx = other.pos.x - nx;
+                    float dy = other.pos.y - ny;
+                    float distSq = dx * dx + dy * dy;
+
+                    if (distSq < 100f || float.IsNaN(distSq)) continue;
+
+                    float dist = Mathf.Sqrt(distSq);
 
                     const float k_att = 200f;
                     float attMul = 1f;
@@ -1008,11 +1064,13 @@ namespace BetterResearchMenu
                     if (toCollapsed) attMul = 30f;
                     else if (fromCollapsed) attMul = 6f;
 
-                    attraction += (dir / dist) * (dist * dist / k_att) * attMul * BetterResearchMenuMod.settings.contractingForceMultiplier;
+                    float mul = (dist / k_att) * attMul * contForce;
+                    attraction.x += dx * mul;
+                    attraction.y += dy * mul;
                 }
 
                 float isolationFactor = Mathf.Exp(-node.edgeCount * 0.4f);
-                Vector2 centerForce = -node.pos * 1.5f * BetterResearchMenuMod.settings.centerForceMultiplier * isolationFactor;
+                Vector2 centerForce = new Vector2(-nx, -ny) * 1.5f * centerForceMul * isolationFactor;
 
                 Vector2 totalForce = repulsion + attraction + centerForce;
 
@@ -1022,17 +1080,18 @@ namespace BetterResearchMenu
 
                 node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
 
-                float speed = node.velocity.magnitude;
-                if (speed > physicsTemperature)
+                float speedSq = node.velocity.sqrMagnitude;
+                if (speedSq > physicsTemperature * physicsTemperature)
                 {
+                    float speed = Mathf.Sqrt(speedSq);
                     node.velocity *= physicsTemperature / speed;
                 }
-                else if (speed < 0.05f && !ignoreSettings)
+                else if (speedSq < 0.0025f && !ignoreSettings)
                 {
                     node.velocity = Vector2.zero;
                 }
 
-                velocitySum += node.velocity.sqrMagnitude;
+                velocitySum += speedSq;
             }
 
             foreach (var node in nodes)
@@ -1056,7 +1115,6 @@ namespace BetterResearchMenu
 
         private float velocitySum = 0f;
         private HashSet<(ResearchNode, ResearchNode)> phantomEdgeSet = new HashSet<(ResearchNode, ResearchNode)>();
-        private float[] nodeRadiusCache = new float[0];
 
         private Vector2 ComputeCentroidOffset()
         {
@@ -1076,7 +1134,7 @@ namespace BetterResearchMenu
             GUI.DrawTexture(inRect, texGradient);
             GUI.color = Color.white;
 
-            var panelWidth = selectedNode != null ? RightPanelWidth : 0f;
+            var panelWidth = (selectedNode != null && !selectedNode.isPhantom && !selectedNode.isGroupNode) ? RightPanelWidth : 0f;
             if (prevPanelWidth != panelWidth)
             {
                 cameraOffset.x += (panelWidth - prevPanelWidth) / 2f / zoom;
@@ -1155,7 +1213,7 @@ namespace BetterResearchMenu
                 if (!selectionLocked && hoveredNode != null && !isPanning && !wasDraggingNode)
                 {
                     selectedNode = hoveredNode;
-                    selectedProject = hoveredNode.def;
+                    selectedProject = (hoveredNode.isGroupNode || hoveredNode.isPhantom) ? null : hoveredNode.def;
                 }
 
                 if (Event.current.type == EventType.MouseDown && (Event.current.button == 0 || Event.current.button == 1 || Event.current.button == 2))
@@ -1165,7 +1223,7 @@ namespace BetterResearchMenu
                         if (Event.current.button == 0)
                         {
                             selectedNode = hoveredNode;
-                            selectedProject = hoveredNode.def;
+                            selectedProject = (hoveredNode.isGroupNode || hoveredNode.isPhantom) ? null : hoveredNode.def;
 
                             hoveredNode.isDragging = true;
                             wasDraggingNode = true;
@@ -1176,7 +1234,8 @@ namespace BetterResearchMenu
                         }
                         else if (Event.current.button == 1)
                         {
-                            CollapseNode(hoveredNode);
+                            if (!hoveredNode.isGroupNode && !hoveredNode.isPhantom)
+                                CollapseNode(hoveredNode);
                         }
                         Event.current.Use();
                     }
@@ -1199,7 +1258,7 @@ namespace BetterResearchMenu
                 isPanning = false;
                 if (wasDraggingNode)
                 {
-                    if (Event.current.button == 0 && selectedNode != null && Vector2.Distance(localMousePos, dragStartMousePos) < 5f)
+                    if (Event.current.button == 0 && selectedNode != null && !selectedNode.isGroupNode && !selectedNode.isPhantom && Vector2.Distance(localMousePos, dragStartMousePos) < 5f)
                     {
                         selectionLocked = true;
                         if (selectedNode.state == NodeState.Minimized || selectedNode.state == NodeState.Dot)
@@ -1479,7 +1538,7 @@ namespace BetterResearchMenu
                 DrawLeftBar(inRect);
             }
             DrawBottomBar(inRect);
-            if (selectedNode != null && selectedNode.isPhantom is false)
+            if (selectedNode != null && !selectedNode.isPhantom && !selectedNode.isGroupNode)
                 DrawRightPanel(inRect);
         }
 
@@ -1679,6 +1738,8 @@ namespace BetterResearchMenu
             float btnMargin = 5f;
             float btnSize = 24f;
 
+            if (selectedNode == null || selectedNode.isGroupNode || selectedNode.isPhantom) return;
+
             var panelRect = new Rect(inRect.width - RightPanelWidth, TopBarHeight, RightPanelWidth, inRect.height - TopBarHeight - BottomBarHeight);
             Widgets.DrawBoxSolid(panelRect, Widgets.WindowBGFillColor);
             Text.Anchor = TextAnchor.MiddleCenter;
@@ -1696,7 +1757,6 @@ namespace BetterResearchMenu
             }
             Text.Anchor = TextAnchor.UpperLeft;
             Text.Font = GameFont.Small;
-            if (selectedNode is null) return;
             if (selectedProject != selectedNode.def)
             {
                 selectedProject = selectedNode.def;
@@ -1874,7 +1934,6 @@ namespace BetterResearchMenu
                 }
                 Log.Message($"[BRM Reheat] physicsTemperature={physicsTemperature:F4}, velocitySum={velocitySum:F6}, maxNodeVelocity={Mathf.Sqrt(maxVel):F6} ({maxVelNode?.def?.defName ?? "null"})");
                 physicsTemperature = 100f;
-                debugLogNextTick = true;
                 SoundDefOf.Click.PlayOneShotOnCamera();
             }
             TooltipHandler.TipRegion(reheatBtnRect, "Reheat (debug)");
