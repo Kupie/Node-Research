@@ -978,6 +978,11 @@ namespace BetterResearchMenu
                 node.lastCenterForce = centerForce;
 
                 node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
+
+                float speed = node.velocity.magnitude;
+                if (speed > physicsTemperature)
+                    node.velocity *= physicsTemperature / speed;
+
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
@@ -989,8 +994,6 @@ namespace BetterResearchMenu
                 node.pos += move;
                 netMovement += move;
                 movedCount++;
-
-                if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
             }
 
             if (movedCount > 0)
@@ -998,8 +1001,9 @@ namespace BetterResearchMenu
                 Vector2 drift = netMovement / movedCount;
                 foreach (var node in nodes)
                 {
-                    if (node.state != NodeState.Hidden && !node.isDragging)
-                        node.pos -= drift;
+                    if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
+                    node.pos -= drift;
+                    if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
                 }
             }
 
@@ -1007,7 +1011,7 @@ namespace BetterResearchMenu
             else
             {
                 physicsTemperature *= 0.997f;
-                if (isPanning || wasDraggingNode || hasSignificantDrag)
+                if (wasDraggingNode || hasSignificantDrag)
                     physicsTemperature = Mathf.Max(physicsTemperature, 20f);
             }
 
