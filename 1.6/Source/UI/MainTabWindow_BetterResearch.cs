@@ -167,8 +167,6 @@ namespace BetterResearchMenu
         private float physicsTemperature = 0f;
         private int fastForwardTicks = 0;
         private bool[,] adjacencyMatrix;
-        private bool continuousDebugLogging = true;
-        private int debugLogTickCounter = 0;
         private bool isPanning;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
@@ -973,16 +971,6 @@ namespace BetterResearchMenu
         {
             if (!BetterResearchMenuMod.settings.physicsEnabled && !ignoreSettings) { physicsTemperature = 0f; return; }
             if (physicsTemperature < 0.01f) { physicsTemperature = 0f; velocitySum = 0f; return; }
-
-            if (continuousDebugLogging)
-            {
-                debugLogTickCounter++;
-                if (debugLogTickCounter % 30 == 0)
-                {
-                    int activeCount = nodes.Count(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom && !n.isAnchor);
-                    Log.Message($"[BRM PhysicsTick #{debugLogTickCounter}] temp={physicsTemperature:F4}, active={activeCount}, movedCount={nodes.Count(n => n.velocity.sqrMagnitude > 0.01f)}");
-                }
-            }
 
             velocitySum = 0f;
             int nodeCount = nodes.Count;
