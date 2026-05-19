@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
   <BetterResearchMenu.GroupNodeDef>
-    <defName>BRM_Group_StoneWork</defName>
-    <label>Stonework</label>
-    <texPath>UI/TechLevels/Neolithic</texPath>
+    <defName>Ferny_RepublicProjects</defName>
+    <label>Republics</label>
+    <texPath>ResearchIcons/Republics</texPath>
     <tab>Main</tab>
   </BetterResearchMenu.GroupNodeDef>
 </Defs>
