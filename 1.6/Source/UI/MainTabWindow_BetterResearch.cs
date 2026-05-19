@@ -163,6 +163,8 @@ namespace BetterResearchMenu
         private float IconPadding = 12f;
         private float physicsTemperature = 0f;
         private bool debugLogNextTick = false;
+        private bool continuousDebugLogging = true;
+        private int debugLogTickCounter = 0;
         private bool isPanning;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
@@ -464,69 +466,6 @@ namespace BetterResearchMenu
                 }
             }
 
-            foreach (var node in nodes)
-                node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
-
-            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
-            if (!seededLayoutKeys.Contains(layoutKey))
-            {
-                SeedHierarchicalPositions();
-                seededLayoutKeys.Add(layoutKey);
-            }
-
-            if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined)
-            {
-                phantomEdgeSet.Clear();
-                var phantomNodeByEra = new Dictionary<TechLevel, ResearchNode>();
-                int nonPhantomCount = nodes.Count;
-                for (int pi = 0; pi < nonPhantomCount; pi++)
-                {
-                    var node = nodes[pi];
-                    if (node.isPhantom || node.def.prerequisites == null) continue;
-                    foreach (var prereq in node.def.prerequisites)
-                    {
-                        if (prereq.techLevel == currentEra || prereq.techLevel == TechLevel.Undefined) continue;
-
-                        var era = prereq.techLevel;
-                        if (!phantomNodeByEra.TryGetValue(era, out var phantom))
-                        {
-                            phantom = new ResearchNode
-                            {
-                                isPhantom = true,
-                                phantomEra = era,
-                                state = NodeState.Minimized,
-                                isFoundation = false,
-                                isEmergence = false
-                            };
-                            phantom.cachedKey = $"phantom_{(int)era}_{(int)currentEra}";
-                            if (State.nodePositions.TryGetValue(phantom.cachedKey, out var savedPos))
-                                phantom.pos = savedPos;
-                            else
-                                phantom.pos = new Vector2(((int)era - (int)currentEra) * techLevelSpacing, 0f);
-                            phantom.drawPos = phantom.pos;
-                            phantomNodeByEra[era] = phantom;
-                            nodes.Add(phantom);
-                            phantom.nodeIndex = nodes.Count - 1;
-                            phantom.cachedMass = 1f + Mathf.Pow(phantom.edgeCount, 1.2f) * 0.5f;
-                        }
-
-                        if (phantomEdgeSet.Add((phantom, node)))
-                        {
-                            var edge = new ResearchEdge { from = phantom, to = node };
-                            edges.Add(edge);
-                            phantom.nodeEdges.Add(edge);
-                            node.nodeEdges.Add(edge);
-                            phantom.edgeCount++;
-                            phantom.childCount++;
-                            node.edgeCount++;
-                            phantom.connectedNodes.Add(node);
-                            node.connectedNodes.Add(phantom);
-                            node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
-                        }
-                    }
-                }
-            }
-
             {
                 int preGroupCount = nodes.Count;
                 var groupNodeByDef = new Dictionary<GroupNodeDef, ResearchNode>();
@@ -566,10 +505,100 @@ namespace BetterResearchMenu
                     node.edgeCount++;
                     groupNode.connectedNodes.Add(node);
                     node.connectedNodes.Add(groupNode);
-                    node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
                 }
-                foreach (var gn in groupNodeByDef.Values)
-                    gn.cachedMass = 1f + Mathf.Pow(gn.edgeCount, 1.2f) * 0.5f;
+                
+                foreach (var groupNode in groupNodeByDef.Values)
+                {
+                    if (groupNode.groupNodeDef.prerequisites != null)
+                    {
+                        foreach (var prereq in groupNode.groupNodeDef.prerequisites)
+                        {
+                            var parentNode = nodes.FirstOrDefault(n => !n.isPhantom && !n.isGroupNode && n.def == prereq);
+                            if (parentNode != null)
+                            {
+                                var edge = new ResearchEdge { from = parentNode, to = groupNode, isGroupEdge = true };
+                                edges.Add(edge);
+                                parentNode.nodeEdges.Add(edge);
+                                groupNode.nodeEdges.Add(edge);
+                                parentNode.edgeCount++;
+                                parentNode.childCount++;
+                                groupNode.edgeCount++;
+                                parentNode.connectedNodes.Add(groupNode);
+                                groupNode.connectedNodes.Add(parentNode);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined)
+            {
+                phantomEdgeSet.Clear();
+                var phantomNodeByEra = new Dictionary<TechLevel, ResearchNode>();
+                int nonPhantomCount = nodes.Count;
+                for (int pi = 0; pi < nonPhantomCount; pi++)
+                {
+                    var node = nodes[pi];
+                    if (node.isPhantom) continue;
+
+                    List<ResearchProjectDef> prereqs = null;
+                    if (node.isGroupNode && node.groupNodeDef.prerequisites != null)
+                        prereqs = node.groupNodeDef.prerequisites;
+                    else if (node.def != null && node.def.prerequisites != null)
+                        prereqs = node.def.prerequisites;
+
+                    if (prereqs == null) continue;
+
+                    foreach (var prereq in prereqs)
+                    {
+                        if (prereq.techLevel == currentEra || prereq.techLevel == TechLevel.Undefined) continue;
+
+                        var era = prereq.techLevel;
+                        if (!phantomNodeByEra.TryGetValue(era, out var phantom))
+                        {
+                            phantom = new ResearchNode
+                            {
+                                isPhantom = true,
+                                phantomEra = era,
+                                state = NodeState.Minimized,
+                                isFoundation = false,
+                                isEmergence = false
+                            };
+                            phantom.cachedKey = $"phantom_{(int)era}_{(int)currentEra}";
+                            if (State.nodePositions.TryGetValue(phantom.cachedKey, out var savedPos))
+                                phantom.pos = savedPos;
+                            else
+                                phantom.pos = new Vector2(((int)era - (int)currentEra) * techLevelSpacing, 0f);
+                            phantom.drawPos = phantom.pos;
+                            phantomNodeByEra[era] = phantom;
+                            nodes.Add(phantom);
+                            phantom.nodeIndex = nodes.Count - 1;
+                        }
+
+                        if (phantomEdgeSet.Add((phantom, node)))
+                        {
+                            var edge = new ResearchEdge { from = phantom, to = node };
+                            edges.Add(edge);
+                            phantom.nodeEdges.Add(edge);
+                            node.nodeEdges.Add(edge);
+                            phantom.edgeCount++;
+                            phantom.childCount++;
+                            node.edgeCount++;
+                            phantom.connectedNodes.Add(node);
+                            node.connectedNodes.Add(phantom);
+                        }
+                    }
+                }
+            }
+
+            foreach (var node in nodes)
+                node.cachedMass = 1f + Mathf.Pow(node.edgeCount, 1.2f) * 0.5f;
+
+            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
+            if (!seededLayoutKeys.Contains(layoutKey))
+            {
+                SeedHierarchicalPositions();
+                seededLayoutKeys.Add(layoutKey);
             }
 
             var anchor = nodes.FirstOrDefault(n => n.isPhantom);
@@ -744,7 +773,7 @@ namespace BetterResearchMenu
 
         private void InitPhysicsLayout()
         {
-            physicsTemperature = 100f;
+            physicsTemperature = 200f;
             var activeCount = nodes.Count(n => n.state != NodeState.Hidden);
             if (activeCount == 0) return;
 
@@ -752,9 +781,8 @@ namespace BetterResearchMenu
             {
                 PhysicsTick(0.04f, true);
 
-                if (i > 150 && (velocitySum / activeCount) < 0.00001f)
+                if (i > 150 && (velocitySum / activeCount) < 0.001f)
                 {
-                    Log.Message($"[BRM] Layout settled at {i}");
                     break;
                 }
             }
@@ -906,18 +934,31 @@ namespace BetterResearchMenu
             if (!BetterResearchMenuMod.settings.physicsEnabled && !ignoreSettings) { physicsTemperature = 0f; return; }
             if (physicsTemperature < 0.01f) { physicsTemperature = 0f; velocitySum = 0f; return; }
 
+            if (continuousDebugLogging)
+            {
+                debugLogTickCounter++;
+                if (debugLogTickCounter % 30 == 0)
+                {
+                    int activeCount = nodes.Count(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom && !n.isAnchor);
+                    Log.Message($"[BRM PhysicsTick #{debugLogTickCounter}] temp={physicsTemperature:F4}, active={activeCount}, movedCount={nodes.Count(n => n.velocity.sqrMagnitude > 0.01f)}");
+                }
+            }
+
             velocitySum = 0f;
             int nodeCount = nodes.Count;
-            int movedCount = 0;
-            Vector2 netMovement = Vector2.zero;
-
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom)
+                if (node.isDragging || node.state == NodeState.Hidden || node.isPhantom || node.isAnchor)
                 {
                     node.velocity = Vector2.zero;
                     continue;
+                }
+
+                if (float.IsNaN(node.pos.x) || float.IsNaN(node.pos.y))
+                {
+                    node.pos = new Vector2(Rand.Range(-10f, 10f), Rand.Range(-10f, 10f));
+                    node.velocity = Vector2.zero;
                 }
 
                 Vector2 repulsion = Vector2.zero;
@@ -932,7 +973,7 @@ namespace BetterResearchMenu
 
                     Vector2 dir = node.pos - other.pos;
                     float dist = dir.magnitude;
-                    if (dist < 1f) { dir = Rand.UnitVector2; dist = 1f; }
+                    if (float.IsNaN(dist) || dist < 1f) { dir = Rand.UnitVector2; dist = 1f; }
 
                     float k = 500f * BetterResearchMenuMod.settings.spacingForceMultiplier;
                     float weight = (1f + Mathf.Sqrt(node.childCount) * 0.5f) * (1f + Mathf.Sqrt(other.childCount) * 0.5f);
@@ -941,8 +982,11 @@ namespace BetterResearchMenu
                     if (node.connectedNodes.Contains(other)) forceMag *= 0.4f;
 
                     bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
-                    if (isCollapsed && !otherIsCollapsed) forceMag *= 0.15f;
-                    else if (isCollapsed && otherIsCollapsed) forceMag *= 2.0f;
+                    
+                    float collapseRepulsionMul = 1f;
+                    if (isCollapsed && otherIsCollapsed) collapseRepulsionMul = 2.0f;
+                    else if (isCollapsed || otherIsCollapsed) collapseRepulsionMul = 0.15f;
+                    forceMag *= collapseRepulsionMul;
 
                     repulsion += (dir / dist) * forceMag;
                 }
@@ -954,16 +998,15 @@ namespace BetterResearchMenu
 
                     Vector2 dir = other.pos - node.pos;
                     float dist = dir.magnitude;
-                    if (dist < 10f) continue;
+                    if (float.IsNaN(dist) || dist < 10f) continue;
 
                     const float k_att = 200f;
                     float attMul = 1f;
 
-                    if (isCollapsed)
-                    {
-                        bool isParentEdge = edge.to == node;
-                        attMul = isParentEdge ? 30f : 6f;
-                    }
+                    bool fromCollapsed = edge.from.state == NodeState.Dot || edge.from.state == NodeState.Minimized;
+                    bool toCollapsed = edge.to.state == NodeState.Dot || edge.to.state == NodeState.Minimized;
+                    if (toCollapsed) attMul = 30f;
+                    else if (fromCollapsed) attMul = 6f;
 
                     attraction += (dir / dist) * (dist * dist / k_att) * attMul * BetterResearchMenuMod.settings.contractingForceMultiplier;
                 }
@@ -981,54 +1024,33 @@ namespace BetterResearchMenu
 
                 float speed = node.velocity.magnitude;
                 if (speed > physicsTemperature)
+                {
                     node.velocity *= physicsTemperature / speed;
+                }
+                else if (speed < 0.05f && !ignoreSettings)
+                {
+                    node.velocity = Vector2.zero;
+                }
 
                 velocitySum += node.velocity.sqrMagnitude;
             }
 
             foreach (var node in nodes)
             {
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
+                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor) continue;
 
                 Vector2 move = node.velocity * dt * 8f;
                 node.pos += move;
-                netMovement += move;
-                movedCount++;
             }
 
-            if (movedCount > 0)
-            {
-                Vector2 drift = netMovement / movedCount;
-                foreach (var node in nodes)
-                {
-                    if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor || node.isPhantom) continue;
-                    node.pos -= drift;
-                    if (!ignoreSettings) State.nodePositions[node.cachedKey] = node.pos;
-                }
-            }
-
-            if (ignoreSettings) physicsTemperature *= 0.99f;
+            if (ignoreSettings) physicsTemperature *= 0.995f;
             else
             {
-                physicsTemperature *= 0.997f;
+                physicsTemperature *= 0.96f;
                 if (wasDraggingNode || hasSignificantDrag)
-                    physicsTemperature = Mathf.Max(physicsTemperature, 20f);
-            }
-
-            if (debugLogNextTick)
-            {
-                debugLogNextTick = false;
-                var topMovers = nodes
-                    .Where(n => n.state != NodeState.Hidden && !n.isDragging && !n.isPhantom)
-                    .OrderByDescending(n => n.velocity.sqrMagnitude)
-                    .Take(3)
-                    .ToList();
-                foreach (var n in topMovers)
                 {
-                    Log.Message($"[BRM TopMover] {n.def.defName}: vel={n.velocity.magnitude:F4}, pos=({n.pos.x:F1},{n.pos.y:F1}), edgeCount={n.edgeCount}, isFoundation={n.isFoundation}\n" +
-                        $"  Rep: {n.lastRepulsionForce.magnitude:F1}, Att: {n.lastAttractionForce.magnitude:F1}, Ctr: {n.lastCenterForce.magnitude:F1}");
+                    physicsTemperature = Mathf.Max(physicsTemperature, 20f);
                 }
-                Log.Message($"[BRM PostReheat] physicsTemperature={physicsTemperature:F4}, velocitySum={velocitySum:F6}");
             }
         }
 
@@ -1100,7 +1122,6 @@ namespace BetterResearchMenu
                 {
                     var node = nodes[i];
                     if (node.state == NodeState.Hidden) continue;
-                    if (node.isPhantom || node.isGroupNode) continue;
                     if (!node.matchesSearchCache) continue;
                     var screenPos = (node.drawPos + cameraOffset) * zoom + pivot;
 
@@ -1889,9 +1910,9 @@ namespace BetterResearchMenu
             GUI.DrawTexture(new Rect(contractingRect.x - 24f, contractingRect.y + 1f, iconSize, iconSize), TexContracting);
             BetterResearchMenuMod.settings.contractingForceMultiplier = Widgets.HorizontalSlider(contractingRect, BetterResearchMenuMod.settings.contractingForceMultiplier, 0.1f, 5.0f, true);
 
-            if (oldGrav != BetterResearchMenuMod.settings.centerForceMultiplier ||
-                oldSpace != BetterResearchMenuMod.settings.spacingForceMultiplier ||
-                oldCont != BetterResearchMenuMod.settings.contractingForceMultiplier)
+            if (!Mathf.Approximately(oldGrav, BetterResearchMenuMod.settings.centerForceMultiplier) ||
+                !Mathf.Approximately(oldSpace, BetterResearchMenuMod.settings.spacingForceMultiplier) ||
+                !Mathf.Approximately(oldCont, BetterResearchMenuMod.settings.contractingForceMultiplier))
             {
                 BetterResearchMenuMod.instance.WriteSettings();
                 physicsTemperature = Mathf.Max(physicsTemperature, 100f);

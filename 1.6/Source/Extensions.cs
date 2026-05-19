@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -29,6 +30,7 @@ namespace BetterResearchMenu
         public string texPath;
         public ResearchTabDef tab;
         public TechLevel techLevel = TechLevel.Undefined;
+        public List<ResearchProjectDef> prerequisites;
 
         private Texture2D resolvedTex;
         public Texture2D GetTexture()
