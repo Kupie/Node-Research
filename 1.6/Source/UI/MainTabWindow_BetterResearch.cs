@@ -166,7 +166,16 @@ namespace BetterResearchMenu
         private float IconPadding = 12f;
         private float physicsTemperature = 0f;
         private int fastForwardTicks = 0;
-        private bool[,] adjacencyMatrix;
+        private bool[] adjacencyMatrixFlat;
+        private static bool[] isHiddenCache = new bool[1000];
+        private static bool[] isCollapsedCache = new bool[1000];
+        private static bool[] isHubCache = new bool[1000];
+        private static float[] weightCache = new float[1000];
+        private static float[] radiusCache = new float[1000];
+        private static float[] pX = new float[1000];
+        private static float[] pY = new float[1000];
+        private static float[] centerForceBaseCache = new float[1000];
+        private static float[] invMassCache = new float[1000];
         private bool isPanning;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
@@ -188,11 +197,14 @@ namespace BetterResearchMenu
         private static Dictionary<string, Vector2> cachedCameraOffsets = [];
         private static HashSet<string> seededLayoutKeys = new HashSet<string>();
 
+        public static bool sessionInitialized = false;
+
         public static void ResetSession()
         {
             currentEra = TechLevel.Undefined;
             cachedCameraOffsets.Clear();
             seededLayoutKeys.Clear();
+            sessionInitialized = false;
         }
 
         private static Dictionary<ResearchProjectDef, List<Def>> cachedUnlockedDefs = [];
@@ -375,8 +387,13 @@ namespace BetterResearchMenu
             base.PreOpen();
             if (CurTab == null) CurTab = DefsOf.Main;
             lastCurTab = CurTab;
-            if (currentEra == TechLevel.Undefined && Faction.OfPlayer.def.techLevel != TechLevel.Undefined)
-                currentEra = Faction.OfPlayer.def.techLevel;
+
+            if (!sessionInitialized)
+            {
+                if (Faction.OfPlayer != null && Faction.OfPlayer.def.techLevel != TechLevel.Undefined)
+                    currentEra = Faction.OfPlayer.def.techLevel;
+                sessionInitialized = true;
+            }
 
             InitPhysics(true);
         }
@@ -397,6 +414,14 @@ namespace BetterResearchMenu
 
             float techLevelSpacing = 350f;
             float randomOffset = 50f;
+
+            foreach (var node in nodes)
+            {
+                if (!node.isPhantom && node.cachedKey != null)
+                {
+                    State.nodePositions[node.cachedKey] = node.pos;
+                }
+            }
 
             nodes.Clear();
             edges.Clear();
@@ -656,11 +681,11 @@ namespace BetterResearchMenu
             }
 
             for (int i = 0; i < nodes.Count; i++) nodes[i].nodeIndex = i;
-            adjacencyMatrix = new bool[nodes.Count, nodes.Count];
+            adjacencyMatrixFlat = new bool[nodes.Count * nodes.Count];
             foreach (var edge in edges)
             {
-                adjacencyMatrix[edge.from.nodeIndex, edge.to.nodeIndex] = true;
-                adjacencyMatrix[edge.to.nodeIndex, edge.from.nodeIndex] = true;
+                adjacencyMatrixFlat[edge.from.nodeIndex * nodes.Count + edge.to.nodeIndex] = true;
+                adjacencyMatrixFlat[edge.to.nodeIndex * nodes.Count + edge.from.nodeIndex] = true;
             }
 
             foreach (var node in nodes)
@@ -669,8 +694,9 @@ namespace BetterResearchMenu
                 node.cachedWeight = 1f + Mathf.Sqrt(node.childCount) * 0.5f;
             }
 
-            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
-            if (!seededLayoutKeys.Contains(layoutKey))
+            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}_{GodModeReveal}";
+            bool wasSeeded = seededLayoutKeys.Contains(layoutKey);
+            if (!wasSeeded)
             {
                 SeedHierarchicalPositions();
                 seededLayoutKeys.Add(layoutKey);
@@ -708,8 +734,11 @@ namespace BetterResearchMenu
 
             if (instant)
             {
-                InitPhysicsLayout();
-                string key = $"{CurTab.defName}_{currentEra}";
+                if (!wasSeeded)
+                {
+                    InitPhysicsLayout();
+                }
+                string key = $"{CurTab.defName}_{currentEra}_{GodModeReveal}";
                 if (cachedCameraOffsets.TryGetValue(key, out var savedOffset))
                 {
                     cameraOffset = savedOffset;
@@ -722,14 +751,14 @@ namespace BetterResearchMenu
                         if (!bounds.Contains(-cameraOffset))
                         {
                             cameraOffset = ComputeCentroidOffset();
-                            cachedCameraOffsets[key] = cameraOffset;
+                            cachedCameraOffsets[$"{CurTab.defName}_{currentEra}_{GodModeReveal}"] = cameraOffset;
                         }
                     }
                 }
                 else
                 {
                     cameraOffset = ComputeCentroidOffset();
-                    cachedCameraOffsets[key] = cameraOffset;
+                    cachedCameraOffsets[$"{CurTab.defName}_{currentEra}_{GodModeReveal}"] = cameraOffset;
                 }
             }
         }
@@ -881,7 +910,6 @@ namespace BetterResearchMenu
             if (lastCurTab != CurTab)
             {
                 lastCurTab = CurTab;
-                currentEra = CurTab == DefsOf.Main ? Faction.OfPlayer.def.techLevel : TechLevel.Undefined;
                 zoom = 1f;
                 InitPhysics(true);
             }
@@ -1011,7 +1039,7 @@ namespace BetterResearchMenu
                 {
                     CurTab = DefsOf.Main;
                     lastCurTab = DefsOf.Main;
-                    currentEra = TechLevel.Undefined;
+                    currentEra = Faction.OfPlayer != null ? Faction.OfPlayer.def.techLevel : TechLevel.Undefined;
                     selectionLocked = false;
                     selectedNode = null;
                     selectedProject = null;
@@ -1062,12 +1090,35 @@ namespace BetterResearchMenu
             float centerForceMul = BetterResearchMenuMod.settings.centerForceMultiplier;
 
             float graphRadiusBound = Mathf.Max(300f, Mathf.Sqrt(nodeCount) * 120f);
+            float graphRadiusBoundSq = graphRadiusBound * graphRadiusBound;
             float dynamicHubBuffer = Mathf.Clamp(12000f / Mathf.Max(1, nodeCount), 150f, 600f);
+
+            if (isHiddenCache.Length < nodeCount)
+            {
+                int newSize = nodeCount + 200;
+                isHiddenCache = new bool[newSize];
+                isCollapsedCache = new bool[newSize];
+                isHubCache = new bool[newSize];
+                weightCache = new float[newSize];
+                radiusCache = new float[newSize];
+                pX = new float[newSize];
+                pY = new float[newSize];
+                centerForceBaseCache = new float[newSize];
+                invMassCache = new float[newSize];
+            }
 
             for (int i = 0; i < nodeCount; i++)
             {
                 var n = nodes[i];
+                bool hidden = n.state == NodeState.Hidden;
+                isHiddenCache[i] = hidden;
+                if (hidden) continue;
+
                 bool coll = n.state == NodeState.Dot || n.state == NodeState.Minimized;
+                isCollapsedCache[i] = coll;
+                isHubCache[i] = n.isFoundation || n.isGroupNode;
+                weightCache[i] = n.cachedWeight;
+
                 if (n.isGroupNode) n.collisionRadius = 25f;
                 else if (coll)
                 {
@@ -1079,71 +1130,80 @@ namespace BetterResearchMenu
                     if (n.isFoundation || n.isEmergence) n.collisionRadius = 104f;
                     else n.collisionRadius = 40f;
                 }
+                radiusCache[i] = n.collisionRadius;
+                pX[i] = n.pos.x;
+                pY[i] = n.pos.y;
+                centerForceBaseCache[i] = 1.5f * centerForceMul * (n.edgeCount == 0 ? 3.0f : Mathf.Exp(-n.edgeCount * 0.4f));
+                invMassCache[i] = 1f / n.cachedMass;
             }
 
             for (int ni = 0; ni < nodeCount; ni++)
             {
                 var node = nodes[ni];
-                if (node.isDragging || node.state == NodeState.Hidden || node.isPhantom || node.isAnchor)
+                if (node.isDragging || isHiddenCache[ni] || node.isPhantom || node.isAnchor)
                 {
                     node.velocity = Vector2.zero;
                     continue;
                 }
 
-                if (float.IsNaN(node.pos.x) || float.IsNaN(node.pos.y))
+                float nx = pX[ni];
+                float ny = pY[ni];
+
+                if (float.IsNaN(nx) || float.IsNaN(ny))
                 {
-                    node.pos = new Vector2(Rand.Range(-10f, 10f), Rand.Range(-10f, 10f));
+                    nx = Rand.Range(-10f, 10f);
+                    ny = Rand.Range(-10f, 10f);
+                    node.pos = new Vector2(nx, ny);
+                    pX[ni] = nx;
+                    pY[ni] = ny;
                     node.velocity = Vector2.zero;
                 }
 
-                float nx = node.pos.x;
-                float ny = node.pos.y;
                 float repX = 0f;
                 float repY = 0f;
 
-                bool isCollapsed = node.state == NodeState.Dot || node.state == NodeState.Minimized;
-                float nodeWeight = node.cachedWeight;
-                float nodeRadius = node.collisionRadius;
+                bool isCollapsed = isCollapsedCache[ni];
+                float nodeWeight = weightCache[ni];
+                float nodeRadius = radiusCache[ni];
+                bool nodeIsHub = isHubCache[ni];
+
+                float mulIfOtherColl = isCollapsed ? 2.0f : 0.15f;
+                float mulIfOtherNotColl = isCollapsed ? 0.15f : 1f;
+
+                float baseRepWeight = baseRep * nodeWeight;
+                int niRow = ni * nodeCount;
 
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
-                    if (ni == oi) continue;
-                    var other = nodes[oi];
-                    if (other.state == NodeState.Hidden) continue;
-
-                    float dx = nx - other.pos.x;
-                    float dy = ny - other.pos.y;
+                    if (ni == oi || isHiddenCache[oi]) continue;
+                    
+                    float dx = nx - pX[oi];
+                    float dy = ny - pY[oi];
                     float distSq = dx * dx + dy * dy;
 
-                    if (distSq < 1f || float.IsNaN(distSq))
+                    if (!(distSq >= 1f))
                     {
                         dx = Rand.Value - 0.5f;
                         dy = Rand.Value - 0.5f;
+                        if (dx == 0f && dy == 0f) dx = 0.01f;
                         distSq = dx * dx + dy * dy;
                     }
 
-                    float forceMagSq = baseRep * nodeWeight * other.cachedWeight / distSq;
+                    float forceMagSq = baseRepWeight * weightCache[oi] / distSq;
 
-                    if (adjacencyMatrix[ni, oi]) forceMagSq *= 0.4f;
+                    if (adjacencyMatrixFlat[niRow + oi]) forceMagSq *= 0.4f;
 
-                    bool nodeIsHub = node.isFoundation || node.isGroupNode;
-                    bool otherIsHub = other.isFoundation || other.isGroupNode;
+                    bool otherIsHub = isHubCache[oi];
 
                     if (nodeIsHub && otherIsHub)
                     {
-
                         forceMagSq *= 25.0f;
                     }
 
-                    bool otherIsCollapsed = other.state == NodeState.Dot || other.state == NodeState.Minimized;
-                    float collapseRepulsionMul = 1f;
-                    if (isCollapsed && otherIsCollapsed) collapseRepulsionMul = 2.0f;
-                    else if (isCollapsed || otherIsCollapsed) collapseRepulsionMul = 0.15f;
-
-                    forceMagSq *= collapseRepulsionMul;
+                    forceMagSq *= isCollapsedCache[oi] ? mulIfOtherColl : mulIfOtherNotColl;
 
                     float buffer = (nodeIsHub && otherIsHub) ? dynamicHubBuffer : 20f;
-                    float minDist = nodeRadius + other.collisionRadius + buffer;
+                    float minDist = nodeRadius + radiusCache[oi] + buffer;
                     float minDistSq = minDist * minDist;
                     if (distSq < minDistSq)
                     {
@@ -1155,68 +1215,88 @@ namespace BetterResearchMenu
                     repY += dy * forceMagSq;
                 }
 
-                Vector2 repulsion = new Vector2(repX, repY);
-                Vector2 attraction = Vector2.zero;
+                float attX = 0f;
+                float attY = 0f;
 
-                foreach (var edge in node.nodeEdges)
+                int edgeCount = node.nodeEdges.Count;
+                for (int e = 0; e < edgeCount; e++)
                 {
+                    var edge = node.nodeEdges[e];
                     var other = (edge.from == node) ? edge.to : edge.from;
-                    if (other.state == NodeState.Hidden) continue;
+                    int oi = other.nodeIndex;
+                    if (isHiddenCache[oi]) continue;
 
-                    float dx = other.pos.x - nx;
-                    float dy = other.pos.y - ny;
+                    float dx = pX[oi] - nx;
+                    float dy = pY[oi] - ny;
                     float distSq = dx * dx + dy * dy;
 
-                    if (distSq < 100f || float.IsNaN(distSq)) continue;
+                    if (!(distSq >= 100f)) continue;
 
                     float dist = Mathf.Sqrt(distSq);
 
                     const float k_att = 200f;
                     float attMul = 1f;
 
-                    bool fromCollapsed = edge.from.state == NodeState.Dot || edge.from.state == NodeState.Minimized;
-                    bool toCollapsed = edge.to.state == NodeState.Dot || edge.to.state == NodeState.Minimized;
+                    bool fromCollapsed = isCollapsedCache[edge.from.nodeIndex];
+                    bool toCollapsed = isCollapsedCache[edge.to.nodeIndex];
                     if (toCollapsed) attMul = 30f;
                     else if (fromCollapsed) attMul = 6f;
 
                     float mul = (dist / k_att) * attMul * contForce;
-                    attraction.x += dx * mul;
-                    attraction.y += dy * mul;
+                    attX += dx * mul;
+                    attY += dy * mul;
                 }
 
-                float distToCenter = Mathf.Sqrt(nx * nx + ny * ny);
-                float distanceMultiplier = 1f + Mathf.Pow(distToCenter / graphRadiusBound, 2f);
-                float isolationFactor = node.edgeCount == 0 ? 3.0f : Mathf.Exp(-node.edgeCount * 0.4f);
-                Vector2 centerForce = new Vector2(-nx, -ny) * 1.5f * centerForceMul * isolationFactor * distanceMultiplier;
+                float distToCenterSq = nx * nx + ny * ny;
+                float distanceMultiplier = 1f + (distToCenterSq / graphRadiusBoundSq);
+                float centerForceFactor = centerForceBaseCache[ni] * distanceMultiplier;
+                
+                float cx = -nx * centerForceFactor;
+                float cy = -ny * centerForceFactor;
 
-                Vector2 totalForce = repulsion + attraction + centerForce;
+                float totalForceX = repX + attX + cx;
+                float totalForceY = repY + attY + cy;
 
-                node.lastRepulsionForce = repulsion;
-                node.lastAttractionForce = attraction;
-                node.lastCenterForce = centerForce;
+                node.lastRepulsionForce = new Vector2(repX, repY);
+                node.lastAttractionForce = new Vector2(attX, attY);
+                node.lastCenterForce = new Vector2(cx, cy);
 
-                node.velocity = (node.velocity + (totalForce / node.cachedMass) * dt) * 0.75f;
+                float vx = node.velocity.x;
+                float vy = node.velocity.y;
+                float invMass = invMassCache[ni];
 
-                float speedSq = node.velocity.sqrMagnitude;
-                if (speedSq > physicsTemperature * physicsTemperature)
+                vx = (vx + totalForceX * invMass * dt) * 0.75f;
+                vy = (vy + totalForceY * invMass * dt) * 0.75f;
+
+                float speedSq = vx * vx + vy * vy;
+                float physTempSq = physicsTemperature * physicsTemperature;
+                
+                if (speedSq > physTempSq)
                 {
                     float speed = Mathf.Sqrt(speedSq);
-                    node.velocity *= physicsTemperature / speed;
+                    float shrink = physicsTemperature / speed;
+                    vx *= shrink;
+                    vy *= shrink;
+                    speedSq = physTempSq;
                 }
                 else if (speedSq < 0.0025f && !ignoreSettings)
                 {
-                    node.velocity = Vector2.zero;
+                    vx = 0f;
+                    vy = 0f;
+                    speedSq = 0f;
                 }
 
+                node.velocity = new Vector2(vx, vy);
                 velocitySum += speedSq;
             }
 
-            foreach (var node in nodes)
+            for (int i = 0; i < nodeCount; i++)
             {
-                if (node.isDragging || node.state == NodeState.Hidden || node.isAnchor) continue;
+                var node = nodes[i];
+                if (node.isDragging || isHiddenCache[node.nodeIndex] || node.isAnchor) continue;
 
-                Vector2 move = node.velocity * dt * 8f;
-                node.pos += move;
+                node.pos.x += node.velocity.x * dt * 8f;
+                node.pos.y += node.velocity.y * dt * 8f;
             }
 
             if (ignoreSettings) physicsTemperature *= 0.995f;
@@ -1703,7 +1783,7 @@ namespace BetterResearchMenu
             {
                 cameraOffset += (localMousePos - lastMousePos) / zoom;
                 lastMousePos = localMousePos;
-                cachedCameraOffsets[$"{CurTab.defName}_{currentEra}"] = cameraOffset;
+                cachedCameraOffsets[$"{CurTab.defName}_{currentEra}_{GodModeReveal}"] = cameraOffset;
                 Event.current.Use();
             }
             else if (Event.current.type == EventType.MouseDrag)
@@ -2097,7 +2177,6 @@ namespace BetterResearchMenu
             CurTab = newTab;
             lastCurTab = newTab;
             selectionLocked = false;
-            currentEra = newTab == DefsOf.Main ? Faction.OfPlayer.def.techLevel : TechLevel.Undefined;
             zoom = 1f;
             InitPhysics(true);
         }
