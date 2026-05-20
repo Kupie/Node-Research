@@ -21,6 +21,7 @@ namespace BetterResearchMenu
             nodePositions = [];
             expandedNodeOrder = [];
             openedNodes = [];
+            startingScenarioTechLevel = TechLevel.Undefined;
         }
 
         public static void ExposeData()

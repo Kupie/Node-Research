@@ -9,6 +9,7 @@ namespace BetterResearchMenu
         public static void Prefix()
         {
             State.Clear();
+            MainTabWindow_BetterResearch.ResetSession();
         }
     }
 }

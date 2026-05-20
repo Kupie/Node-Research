@@ -188,6 +188,13 @@ namespace BetterResearchMenu
         private static Dictionary<string, Vector2> cachedCameraOffsets = [];
         private static HashSet<string> seededLayoutKeys = new HashSet<string>();
 
+        public static void ResetSession()
+        {
+            currentEra = TechLevel.Undefined;
+            cachedCameraOffsets.Clear();
+            seededLayoutKeys.Clear();
+        }
+
         private static Dictionary<ResearchProjectDef, List<Def>> cachedUnlockedDefs = [];
         private static Dictionary<ResearchProjectDef, CachedProjInfo> projInfoCache = new Dictionary<ResearchProjectDef, CachedProjInfo>();
         private static Dictionary<string, Texture2D> cachedCustomTextures = [];
