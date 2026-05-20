@@ -1431,7 +1431,16 @@ namespace BetterResearchMenu
                             }
                             else if (selectedNode.canStartNowCache && !GetActiveProjectsCached(CurTab).Contains(selectedNode.def))
                             {
-                                AttemptBeginResearch(selectedNode.def);
+                                if (selectedNode.def.HasModExtension<EmergenceExtension>() && selectedNode.def.techLevel == TechLevel.Animal)
+                                {
+                                    SoundDefOf.ResearchStart.PlayOneShotOnCamera();
+                                    Find.ResearchManager.SetCurrentProject(selectedNode.def);
+                                    TutorSystem.Notify_Event("StartResearchProject");
+                                }
+                                else
+                                {
+                                    AttemptBeginResearch(selectedNode.def);
+                                }
                             }
                         }
                     }
