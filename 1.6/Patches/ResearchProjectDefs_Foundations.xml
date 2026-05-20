@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Patch>
   <Operation Class="PatchOperationAddModExtension">
-    <xpath>/Defs/ResearchProjectDef[defName="Electricity" or defName="MicroelectronicsBasics" or defName="Machining" or defName="MultiAnalyzer" or defName="Fabrication" or defName="Smithing" or defName="Stonecutting"]</xpath>
+    <xpath>/Defs/ResearchProjectDef[defName="Electricity" or defName="MicroelectronicsBasics" or defName="Machining" or defName="MultiAnalyzer" or defName="Fabrication" or defName="Smithing" or defName="Stonecutting" or defName="ShipBasics" or defName="ShipEngine" or defName="ShipReactor"]</xpath>
     <value>
       <li Class="BetterResearchMenu.ResearchFoundationExtension" />
     </value>

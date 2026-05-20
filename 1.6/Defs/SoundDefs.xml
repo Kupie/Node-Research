@@ -16,7 +16,7 @@
       </li>
     </subSounds>
   </SoundDef>
-  <SoundDef>
+  <!-- <SoundDef>
     <defName>BRM_CollapsingNode</defName>
     <maxSimultaneous>1</maxSimultaneous>
     <subSounds>
@@ -31,7 +31,26 @@
         <pitchRange>0.3~0.7</pitchRange>
       </li>
     </subSounds>
+  </SoundDef> -->
+  <SoundDef>
+    <defName>BRM_CollapsingNode</defName>
+    <maxSimultaneous>1</maxSimultaneous>
+    <subSounds>
+      <li>
+        <onCamera>True</onCamera>
+        <grains>
+          <li Class="AudioGrain_Clip">
+            <clipPath>BRM_CollapsingNode</clipPath>
+          </li>
+        </grains>
+        <volumeRange>25~30</volumeRange>
+        <pitchRange>0.8~1</pitchRange>
+      </li>
+    </subSounds>
   </SoundDef>
+
+
+  
   <SoundDef>
     <defName>BRM_Advancement</defName>
     <maxSimultaneous>1</maxSimultaneous>
@@ -43,7 +62,7 @@
             <clipPath>BRM_Advancement</clipPath>
           </li>
         </grains>
-        <volumeRange>9~9</volumeRange>
+        <volumeRange>35</volumeRange>
         <pitchRange>0.85~1.15</pitchRange>
       </li>
     </subSounds>

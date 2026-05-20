@@ -40,12 +40,12 @@
   <BRM_OpenVanillaMenu>Open vanilla research menu</BRM_OpenVanillaMenu>
   <BRM_RevealAllInGodMode>Reveal all nodes in God Mode</BRM_RevealAllInGodMode>
   <BRM_EnableEmergence>Enable 'Emergence' advancing nodes</BRM_EnableEmergence>
-  <BRM_EmergenceCostNeolithic>Emergence cost (Neolithic): {0}</BRM_EmergenceCostNeolithic>
-  <BRM_EmergenceCostMedieval>Emergence cost (Medieval): {0}</BRM_EmergenceCostMedieval>
-  <BRM_EmergenceCostIndustrial>Emergence cost (Industrial): {0}</BRM_EmergenceCostIndustrial>
-  <BRM_EmergenceCostSpacer>Emergence cost (Spacer): {0}</BRM_EmergenceCostSpacer>
-  <BRM_EmergenceCostUltra>Emergence cost (Ultra): {0}</BRM_EmergenceCostUltra>
-  <BRM_EmergenceCostArchotech>Emergence cost (Archotech): {0}</BRM_EmergenceCostArchotech>
+  <BRM_EmergenceCostNeolithic>Emergence cost (Neolithic):</BRM_EmergenceCostNeolithic>
+  <BRM_EmergenceCostMedieval>Emergence cost (Medieval)</BRM_EmergenceCostMedieval>
+  <BRM_EmergenceCostIndustrial>Emergence cost (Industrial):</BRM_EmergenceCostIndustrial>
+  <BRM_EmergenceCostSpacer>Emergence cost (Spacer):</BRM_EmergenceCostSpacer>
+  <BRM_EmergenceCostUltra>Emergence cost (Ultra):</BRM_EmergenceCostUltra>
+  <BRM_EmergenceCostArchotech>Emergence cost (Archotech):</BRM_EmergenceCostArchotech>
   <BRM_Emergence>EMERGENCE</BRM_Emergence>
   <BRM_EmergenceDesc>Advance to the {0} era.</BRM_EmergenceDesc>
   <BRM_RequiresAllFoundations>Requires all foundations to be completed.</BRM_RequiresAllFoundations>
