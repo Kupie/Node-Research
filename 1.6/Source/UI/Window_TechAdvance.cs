@@ -77,6 +77,10 @@ namespace BetterResearchMenu
             if (Widgets.ButtonText(new Rect(inRect.width / 2f - 125f, inRect.height / 2f + 220f, 250f, 50f), "BRM_Continue".Translate()))
             {
                 Close();
+                if (BetterResearchMenuMod.settings.autoOpenMenuOnFinish)
+                {
+                    Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Research);
+                }
             }
             GUI.color = Color.white;
         }

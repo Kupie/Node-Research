@@ -383,15 +383,14 @@ namespace BetterResearchMenu
 
         public override void PreOpen()
         {
-            TabCollapser.Collapse();
+            Startup.Collapse();
             base.PreOpen();
             if (CurTab == null) CurTab = DefsOf.Main;
             lastCurTab = CurTab;
 
             if (!sessionInitialized)
             {
-                if (Faction.OfPlayer != null && Faction.OfPlayer.def.techLevel != TechLevel.Undefined)
-                    currentEra = Faction.OfPlayer.def.techLevel;
+                currentEra = TechLevel.Undefined;
                 sessionInitialized = true;
             }
 
@@ -1039,7 +1038,7 @@ namespace BetterResearchMenu
                 {
                     CurTab = DefsOf.Main;
                     lastCurTab = DefsOf.Main;
-                    currentEra = Faction.OfPlayer != null ? Faction.OfPlayer.def.techLevel : TechLevel.Undefined;
+                    currentEra = TechLevel.Undefined;
                     selectionLocked = false;
                     selectedNode = null;
                     selectedProject = null;
@@ -1176,7 +1175,7 @@ namespace BetterResearchMenu
                 for (int oi = 0; oi < nodeCount; oi++)
                 {
                     if (ni == oi || isHiddenCache[oi]) continue;
-                    
+
                     float dx = nx - pX[oi];
                     float dy = ny - pY[oi];
                     float distSq = dx * dx + dy * dy;
@@ -1250,7 +1249,7 @@ namespace BetterResearchMenu
                 float distToCenterSq = nx * nx + ny * ny;
                 float distanceMultiplier = 1f + (distToCenterSq / graphRadiusBoundSq);
                 float centerForceFactor = centerForceBaseCache[ni] * distanceMultiplier;
-                
+
                 float cx = -nx * centerForceFactor;
                 float cy = -ny * centerForceFactor;
 
@@ -1270,7 +1269,7 @@ namespace BetterResearchMenu
 
                 float speedSq = vx * vx + vy * vy;
                 float physTempSq = physicsTemperature * physicsTemperature;
-                
+
                 if (speedSq > physTempSq)
                 {
                     float speed = Mathf.Sqrt(speedSq);
@@ -2124,7 +2123,7 @@ namespace BetterResearchMenu
             if (!BetterResearchMenuMod.settings.forbidVanillaMenu && Widgets.ButtonImage(vanillaBtnRect, TexVanilla))
             {
                 Close();
-                TabCollapser.Restore();
+                Startup.Restore();
                 var vanillaWindow = new MainTabWindow_Research();
                 vanillaWindow.def = MainButtonDefOf.Research;
                 Find.WindowStack.Add(vanillaWindow);

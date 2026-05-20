@@ -94,23 +94,23 @@ namespace BetterResearchMenu
                 ls.Label("BRM_EmergenceCostNeolithic".Translate());
                 string neolithicBuffer = settings.emergenceCostNeolithic.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostNeolithic, ref neolithicBuffer);
-                
+
                 ls.Label("BRM_EmergenceCostMedieval".Translate());
                 string medievalBuffer = settings.emergenceCostMedieval.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostMedieval, ref medievalBuffer);
-                
+
                 ls.Label("BRM_EmergenceCostIndustrial".Translate());
                 string industrialBuffer = settings.emergenceCostIndustrial.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostIndustrial, ref industrialBuffer);
-                
+
                 ls.Label("BRM_EmergenceCostSpacer".Translate());
                 string spacerBuffer = settings.emergenceCostSpacer.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostSpacer, ref spacerBuffer);
-                
+
                 ls.Label("BRM_EmergenceCostUltra".Translate());
                 string ultraBuffer = settings.emergenceCostUltra.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostUltra, ref ultraBuffer);
-                
+
                 ls.Label("BRM_EmergenceCostArchotech".Translate());
                 string archotechBuffer = settings.emergenceCostArchotech.ToString();
                 ls.TextFieldNumeric(ref settings.emergenceCostArchotech, ref archotechBuffer);
@@ -125,7 +125,7 @@ namespace BetterResearchMenu
         public override void WriteSettings()
         {
             base.WriteSettings();
-            EmergenceGenerator.UpdateEmergenceNodes();
+            Startup.UpdateEmergenceNodes();
         }
 
         public override string SettingsCategory() => Content.Name;

@@ -16,17 +16,18 @@ namespace BetterResearchMenu
                 State.expandedNodeOrder.Remove(proj.defName);
             }
 
-            if (proj.HasModExtension<EmergenceExtension>())
+            bool isEmergence = proj.HasModExtension<EmergenceExtension>();
+            if (isEmergence)
             {
                 var ext = proj.GetModExtension<EmergenceExtension>();
                 Faction.OfPlayer.def.techLevel = ext.targetLevel;
                 Find.WindowStack.Add(new Window_TechAdvance(ext.targetLevel));
                 DefsOf.BRM_Advancement.PlayOneShotOnCamera();
                 if (Find.WindowStack.WindowOfType<MainTabWindow_BetterResearch>() is MainTabWindow_BetterResearch win)
-                    win.ForceEra(ext.targetLevel);
+                    win.ForceEra(TechLevel.Undefined);
             }
 
-            if (Find.TickManager.TicksGame > 0 && BetterResearchMenuMod.settings.autoOpenMenuOnFinish && Current.ProgramState == ProgramState.Playing)
+            if (!isEmergence && Find.TickManager.TicksGame > 0 && BetterResearchMenuMod.settings.autoOpenMenuOnFinish && Current.ProgramState == ProgramState.Playing)
             {
                 LongEventHandler.ExecuteWhenFinished(() =>
                     Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Research));
