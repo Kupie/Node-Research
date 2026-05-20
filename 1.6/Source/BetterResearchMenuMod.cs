@@ -91,18 +91,29 @@ namespace BetterResearchMenu
 
             if (settings.enableEmergence)
             {
-                ls.Label("BRM_EmergenceCostNeolithic".Translate(settings.emergenceCostNeolithic));
-                settings.emergenceCostNeolithic = ls.Slider(settings.emergenceCostNeolithic, 100f, 10000f);
-                ls.Label("BRM_EmergenceCostMedieval".Translate(settings.emergenceCostMedieval));
-                settings.emergenceCostMedieval = ls.Slider(settings.emergenceCostMedieval, 100f, 10000f);
-                ls.Label("BRM_EmergenceCostIndustrial".Translate(settings.emergenceCostIndustrial));
-                settings.emergenceCostIndustrial = ls.Slider(settings.emergenceCostIndustrial, 100f, 10000f);
-                ls.Label("BRM_EmergenceCostSpacer".Translate(settings.emergenceCostSpacer));
-                settings.emergenceCostSpacer = ls.Slider(settings.emergenceCostSpacer, 100f, 10000f);
-                ls.Label("BRM_EmergenceCostUltra".Translate(settings.emergenceCostUltra));
-                settings.emergenceCostUltra = ls.Slider(settings.emergenceCostUltra, 100f, 10000f);
-                ls.Label("BRM_EmergenceCostArchotech".Translate(settings.emergenceCostArchotech));
-                settings.emergenceCostArchotech = ls.Slider(settings.emergenceCostArchotech, 100f, 10000f);
+                ls.Label("BRM_EmergenceCostNeolithic".Translate());
+                string neolithicBuffer = settings.emergenceCostNeolithic.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostNeolithic, ref neolithicBuffer);
+                
+                ls.Label("BRM_EmergenceCostMedieval".Translate());
+                string medievalBuffer = settings.emergenceCostMedieval.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostMedieval, ref medievalBuffer);
+                
+                ls.Label("BRM_EmergenceCostIndustrial".Translate());
+                string industrialBuffer = settings.emergenceCostIndustrial.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostIndustrial, ref industrialBuffer);
+                
+                ls.Label("BRM_EmergenceCostSpacer".Translate());
+                string spacerBuffer = settings.emergenceCostSpacer.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostSpacer, ref spacerBuffer);
+                
+                ls.Label("BRM_EmergenceCostUltra".Translate());
+                string ultraBuffer = settings.emergenceCostUltra.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostUltra, ref ultraBuffer);
+                
+                ls.Label("BRM_EmergenceCostArchotech".Translate());
+                string archotechBuffer = settings.emergenceCostArchotech.ToString();
+                ls.TextFieldNumeric(ref settings.emergenceCostArchotech, ref archotechBuffer);
             }
 
             if (ModsConfig.IsActive("OskarPotocki.VFE.Tribals"))

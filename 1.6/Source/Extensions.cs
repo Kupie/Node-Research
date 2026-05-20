@@ -31,6 +31,7 @@ namespace BetterResearchMenu
         public ResearchTabDef tab;
         public TechLevel techLevel = TechLevel.Undefined;
         public List<ResearchProjectDef> prerequisites;
+        public List<GroupNodeDef> groupPrerequisites;
 
         private Texture2D resolvedTex;
         public Texture2D GetTexture()

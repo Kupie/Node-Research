@@ -26,11 +26,11 @@ namespace BetterResearchMenu
         public bool revealAllInGodMode = true;
         public bool enableEmergence = true;
         public float emergenceCostNeolithic = 500f;
-        public float emergenceCostMedieval = 1000f;
-        public float emergenceCostIndustrial = 2000f;
-        public float emergenceCostSpacer = 3000f;
-        public float emergenceCostUltra = 4000f;
-        public float emergenceCostArchotech = 5000f;
+        public float emergenceCostMedieval = 5000f;
+        public float emergenceCostIndustrial = 10000f;
+        public float emergenceCostSpacer = 20000f;
+        public float emergenceCostUltra = 40000f;
+        public float emergenceCostArchotech = 100000f;
 
         public float spacingForceMultiplier = 1f;
         public float contractingForceMultiplier = 1f;

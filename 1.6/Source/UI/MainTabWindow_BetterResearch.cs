@@ -470,7 +470,7 @@ namespace BetterResearchMenu
 
             {
                 int preGroupCount = nodes.Count;
-                var groupNodeByDef = new Dictionary<GroupNodeDef, ResearchNode>();
+                var activeGroupDefs = new HashSet<GroupNodeDef>();
                 for (int gi = 0; gi < preGroupCount; gi++)
                 {
                     var node = nodes[gi];
@@ -479,34 +479,64 @@ namespace BetterResearchMenu
                     if (ext?.groupNode == null) continue;
                     var gDef = ext.groupNode;
                     if (gDef.tab != null && gDef.tab != CurTab) continue;
+                    activeGroupDefs.Add(gDef);
+                }
 
-                    if (!groupNodeByDef.TryGetValue(gDef, out var groupNode))
+                var toProcess = new Queue<GroupNodeDef>(activeGroupDefs);
+                while (toProcess.Count > 0)
+                {
+                    var curr = toProcess.Dequeue();
+                    if (curr.groupPrerequisites != null)
                     {
-                        groupNode = new ResearchNode
+                        foreach (var prereq in curr.groupPrerequisites)
                         {
-                            isGroupNode = true,
-                            groupNodeDef = gDef,
-                            state = NodeState.Minimized,
-                        };
-                        groupNode.cachedKey = $"group_{gDef.defName}_{(int)currentEra}";
-                        groupNode.pos = State.nodePositions.TryGetValue(groupNode.cachedKey, out var savedGroupPos)
-                            ? savedGroupPos
-                            : new Vector2(Rand.Range(-150f, 150f), Rand.Range(-150f, 150f));
-                        groupNode.drawPos = groupNode.pos;
-                        groupNodeByDef[gDef] = groupNode;
-                        nodes.Add(groupNode);
-                        groupNode.nodeIndex = nodes.Count - 1;
+                            if (prereq.tab != null && prereq.tab != CurTab) continue;
+                            if (activeGroupDefs.Add(prereq))
+                            {
+                                toProcess.Enqueue(prereq);
+                            }
+                        }
                     }
+                }
 
-                    var gEdge = new ResearchEdge { from = groupNode, to = node, isGroupEdge = true };
-                    edges.Add(gEdge);
-                    groupNode.nodeEdges.Add(gEdge);
-                    node.nodeEdges.Add(gEdge);
-                    groupNode.edgeCount++;
-                    groupNode.childCount++;
-                    node.edgeCount++;
-                    groupNode.connectedNodes.Add(node);
-                    node.connectedNodes.Add(groupNode);
+                var groupNodeByDef = new Dictionary<GroupNodeDef, ResearchNode>();
+                foreach (var gDef in activeGroupDefs)
+                {
+                    var groupNode = new ResearchNode
+                    {
+                        isGroupNode = true,
+                        groupNodeDef = gDef,
+                        state = NodeState.Minimized,
+                    };
+                    groupNode.cachedKey = $"group_{gDef.defName}_{(int)currentEra}";
+                    groupNode.pos = State.nodePositions.TryGetValue(groupNode.cachedKey, out var savedGroupPos)
+                        ? savedGroupPos
+                        : new Vector2(Rand.Range(-150f, 150f), Rand.Range(-150f, 150f));
+                    groupNode.drawPos = groupNode.pos;
+                    groupNodeByDef[gDef] = groupNode;
+                    nodes.Add(groupNode);
+                    groupNode.nodeIndex = nodes.Count - 1;
+                }
+
+                for (int gi = 0; gi < preGroupCount; gi++)
+                {
+                    var node = nodes[gi];
+                    if (node.isPhantom || node.isGroupNode || node.def == null) continue;
+                    var ext = node.def.GetModExtension<GroupParentExtension>();
+                    if (ext?.groupNode == null) continue;
+                    var gDef = ext.groupNode;
+                    if (groupNodeByDef.TryGetValue(gDef, out var groupNode))
+                    {
+                        var gEdge = new ResearchEdge { from = groupNode, to = node, isGroupEdge = true };
+                        edges.Add(gEdge);
+                        groupNode.nodeEdges.Add(gEdge);
+                        node.nodeEdges.Add(gEdge);
+                        groupNode.edgeCount++;
+                        groupNode.childCount++;
+                        node.edgeCount++;
+                        groupNode.connectedNodes.Add(node);
+                        node.connectedNodes.Add(groupNode);
+                    }
                 }
 
                 foreach (var groupNode in groupNodeByDef.Values)
@@ -530,18 +560,31 @@ namespace BetterResearchMenu
                             }
                         }
                     }
+
+                    if (groupNode.groupNodeDef.groupPrerequisites != null)
+                    {
+                        foreach (var prereq in groupNode.groupNodeDef.groupPrerequisites)
+                        {
+                            if (groupNodeByDef.TryGetValue(prereq, out var parentGroupNode))
+                            {
+                                var edge = new ResearchEdge { from = parentGroupNode, to = groupNode, isGroupEdge = true };
+                                edges.Add(edge);
+                                parentGroupNode.nodeEdges.Add(edge);
+                                groupNode.nodeEdges.Add(edge);
+                                parentGroupNode.edgeCount++;
+                                parentGroupNode.childCount++;
+                                groupNode.edgeCount++;
+                                parentGroupNode.connectedNodes.Add(groupNode);
+                                groupNode.connectedNodes.Add(parentGroupNode);
+                            }
+                        }
+                    }
                 }
             }
 
             foreach (var groupNode in nodes.Where(n => n.isGroupNode))
             {
-                bool hasVisibleResearches = groupNode.nodeEdges.Any(e =>
-                {
-                    var other = (e.from == groupNode) ? e.to : e.from;
-                    return !other.isGroupNode && !other.isPhantom && other.state != NodeState.Hidden;
-                });
-
-                if (!hasVisibleResearches)
+                if (!HasVisibleResearch(groupNode, new HashSet<ResearchNode>()))
                     groupNode.state = NodeState.Hidden;
             }
 
@@ -2191,6 +2234,25 @@ namespace BetterResearchMenu
                 list.AddRange(reasons);
 
             return list;
+        }
+
+        private bool HasVisibleResearch(ResearchNode node, HashSet<ResearchNode> visited)
+        {
+            if (!visited.Add(node)) return false;
+            foreach (var edge in node.nodeEdges)
+            {
+                var other = edge.from == node ? edge.to : edge.from;
+                if (other.isPhantom) continue;
+                if (!other.isGroupNode)
+                {
+                    if (other.state != NodeState.Hidden) return true;
+                }
+                else
+                {
+                    if (HasVisibleResearch(other, visited)) return true;
+                }
+            }
+            return false;
         }
     }
 }
