@@ -1,9 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
+
   <BetterResearchMenu.GroupNodeDef>
     <defName>Ferny_RepublicProjects</defName>
     <label>Republics</label>
     <texPath>ResearchIcons/Republics</texPath>
     <tab>Main</tab>
   </BetterResearchMenu.GroupNodeDef>
+
+  <BetterResearchMenu.GroupNodeDef>
+    <defName>Ferny_EasternRepublic</defName>
+    <label>Eastern Republic</label>
+    <texPath>ResearchIcons/EasternRepublic</texPath>
+    <tab>Main</tab>
+    <groupPrerequisites>
+      <li>Ferny_RepublicProjects</li>
+    </groupPrerequisites>
+  </BetterResearchMenu.GroupNodeDef>
+
+  <BetterResearchMenu.GroupNodeDef>
+    <defName>Ferny_WesternRepublic</defName>
+    <label>Western Republic</label>
+    <texPath>ResearchIcons/WesternRepublic</texPath>
+    <tab>Main</tab>
+    <groupPrerequisites>
+      <li>Ferny_RepublicProjects</li>
+    </groupPrerequisites>
+  </BetterResearchMenu.GroupNodeDef>
+
+  <BetterResearchMenu.GroupNodeDef>
+    <defName>Ferny_CentralRepublic</defName>
+    <label>Central Republic</label>
+    <texPath>ResearchIcons/CentralRepublic</texPath>
+    <tab>Main</tab>
+    <groupPrerequisites>
+      <li>Ferny_RepublicProjects</li>
+    </groupPrerequisites>
+  </BetterResearchMenu.GroupNodeDef>
+
 </Defs>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Patch>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="DankPyon_Steel"]</xpath>
+    <value>
+      <li Class="BetterResearchMenu.ResearchFoundationExtension"></li>
+    </value>
+  </Operation>
+
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="DankPyon_Engineering"]</xpath>
+    <value>
+      <li Class="BetterResearchMenu.ResearchFoundationExtension"></li>
+    </value>
+  </Operation>
+
+
+</Patch>

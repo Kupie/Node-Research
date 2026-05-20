@@ -24,7 +24,7 @@
         <onCamera>True</onCamera>
         <grains>
           <li Class="AudioGrain_Clip">
-            <clipPath>BRM_CollapsingNode</clipPath>
+            <clipPath>BRM_ExpandingNode</clipPath>
           </li>
         </grains>
         <volumeRange>25~30</volumeRange>
@@ -40,7 +40,7 @@
         <onCamera>True</onCamera>
         <grains>
           <li Class="AudioGrain_Clip">
-            <clipPath>UI/TinyBell</clipPath>
+            <clipPath>BRM_Advancement</clipPath>
           </li>
         </grains>
         <volumeRange>9~9</volumeRange>

@@ -47,7 +47,7 @@
   <BRM_EmergenceCostUltra>Emergence cost (Ultra): {0}</BRM_EmergenceCostUltra>
   <BRM_EmergenceCostArchotech>Emergence cost (Archotech): {0}</BRM_EmergenceCostArchotech>
   <BRM_Emergence>EMERGENCE</BRM_Emergence>
-  <BRM_EmergenceDesc>Advance to {0}.</BRM_EmergenceDesc>
+  <BRM_EmergenceDesc>Advance to the {0} era.</BRM_EmergenceDesc>
   <BRM_RequiresAllFoundations>Requires all foundations to be completed.</BRM_RequiresAllFoundations>
   <BRM_RequiresEraCompletion>Requires {0} of era projects to be completed.</BRM_RequiresEraCompletion>
 </LanguageData>
