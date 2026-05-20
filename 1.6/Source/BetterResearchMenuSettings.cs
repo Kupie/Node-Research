@@ -57,11 +57,11 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref revealAllInGodMode, "revealAllInGodMode", true);
             Scribe_Values.Look(ref enableEmergence, "enableEmergence", true);
             Scribe_Values.Look(ref emergenceCostNeolithic, "emergenceCostNeolithic", 500f);
-            Scribe_Values.Look(ref emergenceCostMedieval, "emergenceCostMedieval", 1000f);
-            Scribe_Values.Look(ref emergenceCostIndustrial, "emergenceCostIndustrial", 2000f);
-            Scribe_Values.Look(ref emergenceCostSpacer, "emergenceCostSpacer", 3000f);
-            Scribe_Values.Look(ref emergenceCostUltra, "emergenceCostUltra", 4000f);
-            Scribe_Values.Look(ref emergenceCostArchotech, "emergenceCostArchotech", 5000f);
+            Scribe_Values.Look(ref emergenceCostMedieval, "emergenceCostMedieval", 5000f);
+            Scribe_Values.Look(ref emergenceCostIndustrial, "emergenceCostIndustrial", 10000f);
+            Scribe_Values.Look(ref emergenceCostSpacer, "emergenceCostSpacer", 20000f);
+            Scribe_Values.Look(ref emergenceCostUltra, "emergenceCostUltra", 40000f);
+            Scribe_Values.Look(ref emergenceCostArchotech, "emergenceCostArchotech", 100000f);
 
             Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1f);
             Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1f);
