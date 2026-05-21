@@ -1883,6 +1883,7 @@ namespace BetterResearchMenu
                         currentEra = nextEra;
                     InitPhysics(true);
                     DefsOf.BRM_Advancement.PlayOneShotOnCamera();
+                    VFETribalsCompat.GrantCornerstonePoint();
                 }
             }
         }

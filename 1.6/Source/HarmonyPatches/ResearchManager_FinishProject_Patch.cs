@@ -23,6 +23,7 @@ namespace BetterResearchMenu
                 Faction.OfPlayer.def.techLevel = ext.targetLevel;
                 Find.WindowStack.Add(new Window_TechAdvance(ext.targetLevel));
                 DefsOf.BRM_Advancement.PlayOneShotOnCamera();
+                VFETribalsCompat.GrantCornerstonePoint();
                 if (Find.WindowStack.WindowOfType<MainTabWindow_BetterResearch>() is MainTabWindow_BetterResearch win)
                     win.ForceEra(TechLevel.Undefined);
             }
