@@ -1556,8 +1556,6 @@ namespace BetterResearchMenu
             }
 
             Widgets.BeginGroup(graphRect);
-            DrawGraphControls(controlAreaRect);
-            quickSearchWidget.OnGUI(searchBarRect, UpdateSearchResults);
 
             Vector2 WorldToScreen(Vector2 worldPos)
             {
@@ -1733,6 +1731,9 @@ namespace BetterResearchMenu
                 Text.Font = GameFont.Small;
                 Text.Anchor = TextAnchor.UpperLeft;
             }
+
+            DrawGraphControls(controlAreaRect);
+            quickSearchWidget.OnGUI(searchBarRect, UpdateSearchResults);
 
             Widgets.EndGroup();
 
