@@ -19,4 +19,14 @@
   </value>
 </Operation>
 
+<Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/VFETribals.TribalResearchProjectDef[defName="VFET_Culture"]</xpath>
+  <value>
+    <li Class="BetterResearchMenu.ResearchIconExtension">
+      <texPath>ResearchIcons/Culture</texPath>
+      <!-- <markerTexPath>marker icon</markerTexPath> -->
+    </li>
+  </value>
+</Operation>
+
 </Patch>
