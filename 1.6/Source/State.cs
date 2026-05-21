@@ -31,15 +31,14 @@ namespace BetterResearchMenu
             Scribe_Collections.Look(ref expandedNodeOrder, "BRM_ExpandedNodeOrder", LookMode.Value);
             Scribe_Collections.Look(ref openedNodes, "BRM_OpenedNodes", LookMode.Value);
             Scribe_Values.Look(ref startingScenarioTechLevel, "BRM_StartingScenarioTechLevel", TechLevel.Undefined);
-            if (Scribe.mode == LoadSaveMode.PostLoadInit)
-            {
-                nodeStates ??= [];
-                nodePositions ??= [];
-                expandedNodeOrder ??= [];
-                openedNodes ??= [];
-                if (startingScenarioTechLevel == TechLevel.Undefined && Faction.OfPlayer != null)
-                    startingScenarioTechLevel = Faction.OfPlayer.def.techLevel;
-            }
+
+            nodeStates ??= [];
+            nodePositions ??= [];
+            expandedNodeOrder ??= [];
+            openedNodes ??= [];
+
+            if (startingScenarioTechLevel == TechLevel.Undefined && Faction.OfPlayer != null)
+                startingScenarioTechLevel = Faction.OfPlayer.def.techLevel;
         }
     }
 }
