@@ -12,6 +12,18 @@ namespace BetterResearchMenu
 
         static Startup()
         {
+
+            if (DefsOf.Anomaly != null)
+            {
+                foreach (var def in DefDatabase<ResearchProjectDef>.AllDefs)
+                {
+                    if (def.knowledgeCategory != null || def.knowledgeCost > 0f)
+                    {
+                        def.tab = DefsOf.Anomaly;
+                    }
+                }
+            }
+
             foreach (var def in DefDatabase<ResearchProjectDef>.AllDefs)
             {
                 originalTabs[def] = def.tab;

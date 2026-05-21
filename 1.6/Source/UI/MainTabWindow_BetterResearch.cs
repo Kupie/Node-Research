@@ -251,7 +251,15 @@ namespace BetterResearchMenu
         {
             if (!cachedUnlockedDefs.TryGetValue(proj, out var list))
             {
-                list = proj.UnlockedDefs.ToList();
+                try
+                {
+                    list = proj.UnlockedDefs.ToList();
+                }
+                catch (Exception ex)
+                {
+                    Log.ErrorOnce("[BetterResearchMenu] Failed to get unlocked defs for " + proj.defName + ". This project is likely broken by a mod conflict: " + ex, proj.defName.GetHashCode());
+                    list = new List<Def>();
+                }
                 cachedUnlockedDefs[proj] = list;
             }
             return list;
@@ -1745,7 +1753,18 @@ namespace BetterResearchMenu
             }
             DrawBottomBar(inRect);
             if (selectedNode != null && !selectedNode.isPhantom && !selectedNode.isGroupNode)
-                DrawRightPanel(inRect);
+            {
+                try
+                {
+                    DrawRightPanel(inRect);
+                }
+                catch (Exception ex)
+                {
+                    Log.ErrorOnce("[BetterResearchMenu] Error drawing right panel for " + selectedNode.def.defName + ": " + ex, selectedNode.def.defName.GetHashCode());
+                    selectedNode = null;
+                    selectedProject = null;
+                }
+            }
         }
 
         private void HandleInputs(Rect graphRect, Rect sliderExcl, Rect panelExcl, Rect searchBarExcl, Rect inRect)
