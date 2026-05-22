@@ -400,6 +400,8 @@ namespace BetterResearchMenu
             {
                 currentEra = TechLevel.Undefined;
                 sessionInitialized = true;
+                nodes.Clear();
+                edges.Clear();
                 godModeStateSnapshot = null;
                 selectedNode = null;
                 selectedProject = null;
