@@ -199,6 +199,11 @@ namespace BetterResearchMenu
 
         public static bool sessionInitialized = false;
 
+        private static bool HasAccessToAnomalyTab()
+        {
+            return Find.Anomaly.HighestLevelReached > 0 || (!Find.Anomaly.GenerateMonolith && Find.Storyteller.difficulty.AnomalyPlaystyleDef.enableAnomalyContent);
+        }
+
         public static void ResetSession()
         {
             currentEra = TechLevel.Undefined;
@@ -1044,7 +1049,7 @@ namespace BetterResearchMenu
                 bool hasAccessToTab = true;
                 if (CurTab == DefsOf.Anomaly)
                 {
-                    hasAccessToTab = DefsOf.Anomaly != null && Find.Anomaly.HighestLevelReached > 0;
+                    hasAccessToTab = HasAccessToAnomalyTab();
                 }
                 else if (CurTab == DefsOf.VGE_Gravtech)
                 {
@@ -2058,7 +2063,7 @@ namespace BetterResearchMenu
             float tabsMargin = 10f;
             float tabsYOffset = 5f;
 
-            var hasAnomaly = DefsOf.Anomaly != null && (DebugSettings.godMode || Find.Anomaly.HighestLevelReached > 0);
+            var hasAnomaly = DefsOf.Anomaly != null && (DebugSettings.godMode || HasAccessToAnomalyTab());
             var hasGravtech = DefsOf.VGE_Gravtech != null && (DebugSettings.godMode || DefsOf.BasicGravtech.IsFinished);
             var tabCount = 1 + (hasAnomaly ? 1 : 0) + (hasGravtech ? 1 : 0);
             var tabsWidth = tabWidth * tabCount;
@@ -2090,7 +2095,7 @@ namespace BetterResearchMenu
 
             var activeProjs = GetActiveProjectsCached(CurTab);
 
-            bool hasAnomaly = DefsOf.Anomaly != null && (DebugSettings.godMode || Find.Anomaly.HighestLevelReached > 0);
+            bool hasAnomaly = DefsOf.Anomaly != null && (DebugSettings.godMode || HasAccessToAnomalyTab());
             bool hasGravtech = DefsOf.VGE_Gravtech != null && (DebugSettings.godMode || DefsOf.BasicGravtech.IsFinished);
             int tabCount = 1 + (hasAnomaly ? 1 : 0) + (hasGravtech ? 1 : 0);
             float tabsWidth = 120f * tabCount;
