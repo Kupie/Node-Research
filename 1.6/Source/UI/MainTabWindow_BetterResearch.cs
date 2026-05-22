@@ -400,6 +400,23 @@ namespace BetterResearchMenu
             {
                 currentEra = TechLevel.Undefined;
                 sessionInitialized = true;
+                lastGodMode = GodModeReveal;
+                godModeStateSnapshot = null;
+                selectedNode = null;
+                selectedProject = null;
+                selectionLocked = false;
+                lastStateCheckHash = -1;
+                topBarDataCache.Clear();
+                topBarCacheStateHash = -1;
+                activeProjectsCache = null;
+                activeProjectsCacheDirty = true;
+                descHeightCache.Clear();
+                cachedErasWithProjects = null;
+                lastErasTab = null;
+                prevPanelWidth = 0f;
+                physicsTemperature = 0f;
+                fastForwardTicks = 0;
+                zoom = 1f;
             }
 
             InitPhysics(true);
