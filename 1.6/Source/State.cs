@@ -14,6 +14,7 @@ namespace BetterResearchMenu
         public static List<string> expandedNodeOrder = [];
         public static HashSet<string> openedNodes = [];
         public static TechLevel startingScenarioTechLevel = TechLevel.Undefined;
+        public static bool initialized = false;
 
         public static void Clear()
         {
@@ -22,6 +23,7 @@ namespace BetterResearchMenu
             expandedNodeOrder = [];
             openedNodes = [];
             startingScenarioTechLevel = TechLevel.Undefined;
+            initialized = false;
         }
 
         public static void ExposeData()
@@ -31,6 +33,7 @@ namespace BetterResearchMenu
             Scribe_Collections.Look(ref expandedNodeOrder, "BRM_ExpandedNodeOrder", LookMode.Value);
             Scribe_Collections.Look(ref openedNodes, "BRM_OpenedNodes", LookMode.Value);
             Scribe_Values.Look(ref startingScenarioTechLevel, "BRM_StartingScenarioTechLevel", TechLevel.Undefined);
+            Scribe_Values.Look(ref initialized, "BRM_Initialized", false);
 
             nodeStates ??= [];
             nodePositions ??= [];

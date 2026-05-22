@@ -719,7 +719,7 @@ namespace BetterResearchMenu
                 node.cachedWeight = 1f + Mathf.Sqrt(node.childCount) * 0.5f;
             }
 
-            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}_{GodModeReveal}";
+            string layoutKey = $"{CurTab?.defName}_{(int)currentEra}";
             bool wasSeeded = seededLayoutKeys.Contains(layoutKey);
             if (!wasSeeded)
             {
