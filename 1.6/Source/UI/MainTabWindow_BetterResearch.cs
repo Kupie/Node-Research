@@ -226,6 +226,9 @@ namespace BetterResearchMenu
 
         private List<TechLevel> cachedErasWithProjects;
         private ResearchTabDef lastErasTab;
+        private string lastFilterText = "";
+        private float lastSearchTypingTime = 0f;
+        private bool searchPending = false;
 
         public override float Margin => 0f;
         public override Vector2 InitialSize
@@ -419,6 +422,9 @@ namespace BetterResearchMenu
                 descHeightCache.Clear();
                 cachedErasWithProjects = null;
                 lastErasTab = null;
+                lastFilterText = "";
+                lastSearchTypingTime = 0f;
+                searchPending = false;
                 prevPanelWidth = 0f;
                 physicsTemperature = 0f;
                 fastForwardTicks = 0;
@@ -955,6 +961,18 @@ namespace BetterResearchMenu
         public override void WindowUpdate()
         {
             base.WindowUpdate();
+            var currentFilterText = quickSearchWidget.filter.Text;
+            if (currentFilterText != lastFilterText)
+            {
+                lastFilterText = currentFilterText;
+                lastSearchTypingTime = Time.realtimeSinceStartup;
+                searchPending = true;
+            }
+            if (searchPending && Time.realtimeSinceStartup - lastSearchTypingTime >= 0.8f)
+            {
+                searchPending = false;
+                UpdateSearchResults();
+            }
             if (lastCurTab != CurTab)
             {
                 lastCurTab = CurTab;
@@ -1782,7 +1800,7 @@ namespace BetterResearchMenu
             }
 
             DrawGraphControls(controlAreaRect);
-            quickSearchWidget.OnGUI(searchBarRect, UpdateSearchResults);
+            quickSearchWidget.OnGUI(searchBarRect);
 
             Widgets.EndGroup();
 
