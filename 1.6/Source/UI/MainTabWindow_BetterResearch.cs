@@ -449,7 +449,14 @@ namespace BetterResearchMenu
             {
                 if (!node.isPhantom && node.cachedKey != null)
                 {
-                    State.nodePositions[node.cachedKey] = node.pos;
+                    if (node.state == NodeState.Hidden)
+                    {
+                        State.nodePositions.Remove(node.cachedKey);
+                    }
+                    else
+                    {
+                        State.nodePositions[node.cachedKey] = node.pos;
+                    }
                 }
             }
 
@@ -460,18 +467,29 @@ namespace BetterResearchMenu
             {
                 if (def.tab != CurTab) continue;
                 if (CurTab == DefsOf.Main && currentEra != TechLevel.Undefined && def.techLevel != currentEra) continue;
-                if (!GodModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted) continue;
+
+                var cacheKey = $"{def.defName}_{currentEra}";
+                if (!GodModeReveal && BetterResearchMenuMod.settings.restrictViewingFutureProjects && !def.IsFinished && !def.PrerequisitesCompleted)
+                {
+                    State.nodePositions.Remove(cacheKey);
+                    continue;
+                }
 
                 var node = new ResearchNode { def = def };
                 node.isFoundation = def.IsFoundation();
                 node.isEmergence = def.HasModExtension<EmergenceExtension>();
                 node.state = GetNodeState(def);
+                if (node.state == NodeState.Hidden)
+                {
+                    State.nodePositions.Remove(cacheKey);
+                }
+
                 node.isFinishedCache = def.IsFinished;
                 node.canStartNowCache = def.CanStartNow;
                 node.isLockedCache = !node.canStartNowCache && !node.isFinishedCache;
                 node.cachedSubLabel = BuildNodeSubLabel(node);
 
-                if (State.nodePositions.TryGetValue(GetCacheKey(def), out var savedPos))
+                if (State.nodePositions.TryGetValue(cacheKey, out var savedPos))
                 {
                     node.pos = savedPos;
                 }
