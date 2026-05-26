@@ -15,5 +15,11 @@
     </value>
   </Operation>
 
+  <Operation Class="PatchOperationAddModExtension">
+    <xpath>Defs/ResearchProjectDef[defName="DankPyon_Lumber"]</xpath>
+    <value>
+      <li Class="BetterResearchMenu.ResearchFoundationExtension"></li>
+    </value>
+  </Operation>
 
 </Patch>
