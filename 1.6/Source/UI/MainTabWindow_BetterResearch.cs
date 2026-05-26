@@ -196,6 +196,7 @@ namespace BetterResearchMenu
         private static Color currentBgColor = new ColorInt(15, 20, 26).ToColor;
         private static Dictionary<string, Vector2> cachedCameraOffsets = [];
         private static HashSet<string> seededLayoutKeys = new HashSet<string>();
+        private bool appliedSearchActive = false;
 
         public static bool sessionInitialized = false;
 
@@ -403,6 +404,7 @@ namespace BetterResearchMenu
             base.PreOpen();
             if (CurTab == null) CurTab = DefsOf.Main;
             lastCurTab = CurTab;
+            appliedSearchActive = false;
 
             if (!sessionInitialized)
             {
@@ -965,13 +967,23 @@ namespace BetterResearchMenu
             if (currentFilterText != lastFilterText)
             {
                 lastFilterText = currentFilterText;
-                lastSearchTypingTime = Time.realtimeSinceStartup;
-                searchPending = true;
+                if (string.IsNullOrEmpty(currentFilterText))
+                {
+                    searchPending = false;
+                    UpdateSearchResults();
+                    appliedSearchActive = quickSearchWidget.filter.Active;
+                }
+                else
+                {
+                    lastSearchTypingTime = Time.realtimeSinceStartup;
+                    searchPending = true;
+                }
             }
             if (searchPending && Time.realtimeSinceStartup - lastSearchTypingTime >= 0.8f)
             {
                 searchPending = false;
                 UpdateSearchResults();
+                appliedSearchActive = quickSearchWidget.filter.Active;
             }
             if (lastCurTab != CurTab)
             {
@@ -1415,7 +1427,7 @@ namespace BetterResearchMenu
 
             var panelRect = new Rect(inRect.width - RightPanelWidth, TopBarHeight, RightPanelWidth, graphRect.height);
 
-            bool searchActive = quickSearchWidget.filter.Active;
+            bool searchActive = appliedSearchActive;
             foreach (var node in nodes)
             {
                 node.matchesSearchCache = node.isPhantom || node.isGroupNode || !searchActive
