@@ -87,6 +87,7 @@ namespace BetterResearchMenu
 
             ls.Gap();
             ls.CheckboxLabeled("BRM_RevealAllInGodMode".Translate(), ref settings.revealAllInGodMode);
+            ls.CheckboxLabeled("BRM_RevealMysteryNodeOnHover".Translate(), ref settings.revealMysteryNodeOnHover);
             ls.CheckboxLabeled("BRM_EnableEmergence".Translate(), ref settings.enableEmergence);
 
             if (settings.enableEmergence)

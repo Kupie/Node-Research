@@ -39,6 +39,7 @@
   <BRM_OpenSettings>Open mod settings</BRM_OpenSettings>
   <BRM_OpenVanillaMenu>Open vanilla research menu</BRM_OpenVanillaMenu>
   <BRM_RevealAllInGodMode>Reveal all nodes in God Mode</BRM_RevealAllInGodMode>
+  <BRM_RevealMysteryNodeOnHover>Show details when hovering unknown nodes</BRM_RevealMysteryNodeOnHover>
   <BRM_EnableEmergence>Enable 'Emergence' advancing nodes</BRM_EnableEmergence>
   <BRM_EmergenceCostNeolithic>Emergence cost (Neolithic):</BRM_EmergenceCostNeolithic>
   <BRM_EmergenceCostMedieval>Emergence cost (Medieval)</BRM_EmergenceCostMedieval>

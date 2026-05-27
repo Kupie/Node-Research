@@ -1487,8 +1487,11 @@ namespace BetterResearchMenu
 
                 if (!selectionLocked && hoveredNode != null && !isPanning && !wasDraggingNode)
                 {
-                    selectedNode = hoveredNode;
-                    selectedProject = (hoveredNode.isGroupNode || hoveredNode.isPhantom) ? null : hoveredNode.def;
+                    if (!IsMysteryNode(hoveredNode) || BetterResearchMenuMod.settings.revealMysteryNodeOnHover)
+                    {
+                        selectedNode = hoveredNode;
+                        selectedProject = (hoveredNode.isGroupNode || hoveredNode.isPhantom) ? null : hoveredNode.def;
+                    }
                 }
 
                 if (Event.current.type == EventType.MouseDown && (Event.current.button == 0 || Event.current.button == 1 || Event.current.button == 2))
@@ -2420,6 +2423,13 @@ namespace BetterResearchMenu
                 list.AddRange(reasons);
 
             return list;
+        }
+
+        private static bool IsMysteryNode(ResearchNode node)
+        {
+            if (node.isPhantom || node.isGroupNode) return false;
+            if (node.state == NodeState.Expanded) return false;
+            return !(State.openedNodes?.Contains(node.def.defName) ?? false);
         }
 
         private bool HasVisibleResearch(ResearchNode node, HashSet<ResearchNode> visited)

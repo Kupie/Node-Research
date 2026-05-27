@@ -24,6 +24,7 @@ namespace BetterResearchMenu
         public float eraCompletionPercentage = 1f;
 
         public bool revealAllInGodMode = true;
+        public bool revealMysteryNodeOnHover = false;
         public bool enableEmergence = true;
         public float emergenceCostNeolithic = 500f;
         public float emergenceCostMedieval = 5000f;
@@ -55,6 +56,7 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref eraCompletionPercentage, "eraCompletionPercentage", 1f);
 
             Scribe_Values.Look(ref revealAllInGodMode, "revealAllInGodMode", true);
+            Scribe_Values.Look(ref revealMysteryNodeOnHover, "revealMysteryNodeOnHover", false);
             Scribe_Values.Look(ref enableEmergence, "enableEmergence", true);
             Scribe_Values.Look(ref emergenceCostNeolithic, "emergenceCostNeolithic", 500f);
             Scribe_Values.Look(ref emergenceCostMedieval, "emergenceCostMedieval", 5000f);
