@@ -9,12 +9,14 @@ namespace BetterResearchMenu
     {
         public static bool Prepare() => ModsConfig.IsActive("OskarPotocki.VFE.Tribals");
 
-        public static void Postfix(Precept_Ritual __instance, ref bool __result)
+        public static bool Prefix(Precept_Ritual __instance, ref bool __result)
         {
             if (BetterResearchMenuMod.settings.disableVFETribalsAdvancement && __instance.def.defName.StartsWith("VFET_AdvanceTo"))
             {
                 __result = false;
+                return false;
             }
+            return true;
         }
     }
 }
