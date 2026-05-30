@@ -139,6 +139,7 @@ namespace BetterResearchMenu
 
         private const float ControlBtnSize = 24f;
         private const float ControlBtnGap = 8f;
+        private const float ZoomThreshold = 0.1f;
 
         public static List<TechLevel> AllTechLevels = Enum.GetValues(typeof(TechLevel)).Cast<TechLevel>().Where(tl => tl != TechLevel.Undefined).ToList();
         private float TopBarHeight => CurTab == DefsOf.Main ? 45f : 0f;
@@ -1692,14 +1693,9 @@ namespace BetterResearchMenu
                     var gTex = node.groupNodeDef.GetTexture();
                     if (gTex != null)
                         GUI.DrawTexture(gRect.ContractedBy(6f * zoom), gTex);
-                    if (zoom > 0.4f)
+                    if (zoom > ZoomThreshold)
                     {
-                        Text.Anchor = TextAnchor.UpperCenter;
-                        Text.Font = GameFont.Tiny;
-                        float lw = 150f * zoom;
-                        Widgets.Label(new Rect(screenPos.x - lw / 2f, screenPos.y + gSize / 2f + 2f * zoom, lw, 40f * zoom),
-                            node.groupNodeDef.LabelCap);
-                        Text.Anchor = TextAnchor.UpperLeft;
+                        DrawScaledLabel(new Rect(screenPos.x - (150f * zoom) / 2f, screenPos.y + gSize / 2f + 2f * zoom, 150f * zoom, 40f * zoom), node.groupNodeDef.LabelCap, zoom);
                     }
                     continue;
                 }
@@ -1713,14 +1709,9 @@ namespace BetterResearchMenu
                     GUI.color = Color.white;
                     if (TechLevelIcons.TryGetValue(node.phantomEra, out var eraIcon))
                         GUI.DrawTexture(bubbleRect.ContractedBy(7f * zoom), eraIcon);
-                    if (zoom > 0.4f)
+                    if (zoom > ZoomThreshold)
                     {
-                        Text.Anchor = TextAnchor.UpperCenter;
-                        Text.Font = GameFont.Tiny;
-                        float lw = 150f * zoom;
-                        Widgets.Label(new Rect(screenPos.x - lw / 2f, screenPos.y + size / 2f + 2f * zoom, lw, 40f * zoom),
-                            node.phantomEra.ToStringHuman().CapitalizeFirst());
-                        Text.Anchor = TextAnchor.UpperLeft;
+                        DrawScaledLabel(new Rect(screenPos.x - (150f * zoom) / 2f, screenPos.y + size / 2f + 2f * zoom, 150f * zoom, 40f * zoom), node.phantomEra.ToStringHuman().CapitalizeFirst(), zoom);
                     }
                     continue;
                 }
@@ -1794,21 +1785,9 @@ namespace BetterResearchMenu
                 bool isSilhouetted = !node.isFinishedCache;
                 DrawBubble(nodeRect, node.def, padding * zoom, activeProjects, drawSilhouette: isSilhouetted);
 
-                if (zoom > 0.4f)
+                if (zoom > ZoomThreshold)
                 {
-                    Text.Anchor = TextAnchor.UpperCenter;
-                    Text.Font = zoom < 0.6f ? GameFont.Tiny : (zoom > 1.2f ? GameFont.Medium : GameFont.Small);
-
-                    float labelWidth = 200f * zoom;
-                    float unscaledNodeSize = (isFoundation || isEmergence) ? NodeSizeExpanded * 2.6f : NodeSizeExpanded;
-                    Rect labelRect = new Rect(screenPos.x - (labelWidth / 2f), screenPos.y + (unscaledNodeSize * zoom / 2f) + 5f * zoom, labelWidth, 200f * zoom);
-
-                    Widgets.Label(labelRect, node.def.LabelCap);
-                    float titleHeight = node.GetCachedTitleHeight(Text.Font, labelWidth, zoom);
-
-                    Text.Font = GameFont.Tiny;
-                    var subRect = new Rect(labelRect.x, labelRect.y + titleHeight, labelRect.width, labelRect.height);
-                    Widgets.Label(subRect, node.cachedSubLabel);
+                    DrawScaledResearchLabels(node, screenPos, nodeSize, zoom);
                 }
                 Text.Font = GameFont.Small;
                 Text.Anchor = TextAnchor.UpperLeft;
@@ -2449,6 +2428,59 @@ namespace BetterResearchMenu
                 }
             }
             return false;
+        }
+        private void DrawScaledLabel(Rect rect, string text, float zoom, float baseFontSize = 12f)
+        {
+            if (zoom < 0.4f)
+            {
+                int fontSize = Mathf.RoundToInt(baseFontSize * (zoom / 0.4f));
+                GUIStyle style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, alignment = TextAnchor.UpperCenter, wordWrap = true };
+                style.normal.textColor = Color.white;
+                GUI.Label(rect, text, style);
+            }
+            else
+            {
+                Text.Anchor = TextAnchor.UpperCenter;
+                Text.Font = GameFont.Tiny;
+                Widgets.Label(rect, text);
+            }
+        }
+
+        private void DrawScaledResearchLabels(ResearchNode node, Vector2 screenPos, float nodeSize, float zoom)
+        {
+            GameFont currentFont = zoom < 0.6f ? GameFont.Tiny : (zoom > 1.2f ? GameFont.Medium : GameFont.Small);
+            float labelWidth = 200f * zoom;
+            Rect labelRect = new Rect(screenPos.x - (labelWidth / 2f), screenPos.y + (nodeSize / 2f) + 2f * zoom, labelWidth, 500f);
+
+            if (zoom < 0.4f)
+            {
+                float scale = zoom / 0.4f;
+                int mainFontSize = Mathf.RoundToInt(12f * scale);
+                int subFontSize = Mathf.RoundToInt(11f * scale);
+
+                GUIStyle mainStyle = new GUIStyle(GUI.skin.label) { fontSize = mainFontSize, alignment = TextAnchor.UpperCenter, wordWrap = true, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+                mainStyle.normal.textColor = Color.white;
+
+                GUIStyle subStyle = new GUIStyle(GUI.skin.label) { fontSize = subFontSize, alignment = TextAnchor.UpperCenter, wordWrap = true, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+                subStyle.normal.textColor = Color.white;
+
+                float mainHeight = mainStyle.CalcHeight(new GUIContent(node.def.LabelCap), labelWidth);
+                GUI.Label(labelRect, node.def.LabelCap, mainStyle);
+
+                Rect subRect = new Rect(labelRect.x, labelRect.y + mainHeight - (1f * zoom), labelRect.width, 500f);
+                GUI.Label(subRect, node.cachedSubLabel, subStyle);
+            }
+            else
+            {
+                Text.Anchor = TextAnchor.UpperCenter;
+                Text.Font = currentFont;
+                Widgets.Label(labelRect, node.def.LabelCap);
+
+                float mainHeight = node.GetCachedTitleHeight(currentFont, labelWidth, zoom);
+                Text.Font = GameFont.Tiny;
+                Rect subRect = new Rect(labelRect.x, labelRect.y + mainHeight, labelRect.width, 500f);
+                Widgets.Label(subRect, node.cachedSubLabel);
+            }
         }
     }
 }
