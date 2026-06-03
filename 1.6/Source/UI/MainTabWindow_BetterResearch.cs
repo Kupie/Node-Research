@@ -913,8 +913,7 @@ namespace BetterResearchMenu
                     if (ext.targetLevel <= State.startingScenarioTechLevel) return NodeState.Hidden;
                     if (def.techLevel != currentEra && currentEra != TechLevel.Undefined) return NodeState.Hidden;
                     var progress = GetAdvancementProgressRaw(def.techLevel, DefsOf.Main, out _, out _);
-                    var threshold = BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.EraCompletion ? BetterResearchMenuMod.settings.eraCompletionPercentage : 1f;
-                    if (progress < threshold) return NodeState.Hidden;
+                    if (progress < 1f) return NodeState.Hidden;
                 }
             }
 
@@ -1943,8 +1942,7 @@ namespace BetterResearchMenu
             var leftRect = new Rect(0f, TopBarHeight, leftBarWidth, inRect.height - TopBarHeight - BottomBarHeight);
             var progress = GetAdvancementProgress(out var finished, out var total);
 
-            float threshold = BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.EraCompletion ? BetterResearchMenuMod.settings.eraCompletionPercentage : 1f;
-            if (progress >= threshold && playerEra < TechLevel.Archotech)
+            if (progress >= 1f && playerEra < TechLevel.Archotech)
             {
                 var nextEra = (TechLevel)((int)playerEra + 1);
                 var advanceBtnRect = new Rect(leftRect.xMax + 15f, leftRect.y + 15f, 200f, 40f);
@@ -2358,10 +2356,10 @@ namespace BetterResearchMenu
             else
             {
                 var eraProjects = DefDatabase<ResearchProjectDef>.AllDefs.Where(x => x.techLevel == playerEra && x.tab == tab && !x.HasModExtension<EmergenceExtension>()).ToList();
-                total = eraProjects.Count;
+                total = Mathf.Max(1, Mathf.RoundToInt(eraProjects.Count * BetterResearchMenuMod.settings.eraCompletionPercentage));
                 finished = eraProjects.Count(x => x.IsFinished);
             }
-            return total > 0 ? (float)finished / total : 1f;
+            return total > 0 ? Mathf.Clamp01((float)finished / total) : 1f;
         }
 
         private float GetAdvancementProgress(out int finished, out int total) => GetAdvancementProgressRaw(Faction.OfPlayer.def.techLevel, this.CurTab, out finished, out total);
@@ -2378,11 +2376,10 @@ namespace BetterResearchMenu
             if (proj.HasModExtension<EmergenceExtension>())
             {
                 var progress = GetAdvancementProgressRaw(proj.techLevel, DefsOf.Main, out _, out _);
-                float threshold = BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.EraCompletion ? BetterResearchMenuMod.settings.eraCompletionPercentage : 1f;
-                if (progress < threshold)
+                if (progress < 1f)
                 {
                     if (BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.Foundations) list.Add("BRM_RequiresAllFoundations".Translate());
-                    else list.Add("BRM_RequiresEraCompletion".Translate(threshold.ToStringPercent()));
+                    else list.Add("BRM_RequiresEraCompletion".Translate(BetterResearchMenuMod.settings.eraCompletionPercentage.ToStringPercent()));
                 }
             }
 
