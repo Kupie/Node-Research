@@ -912,8 +912,9 @@ namespace BetterResearchMenu
                     var ext = def.GetModExtension<EmergenceExtension>();
                     if (ext.targetLevel <= State.startingScenarioTechLevel) return NodeState.Hidden;
                     if (def.techLevel != currentEra && currentEra != TechLevel.Undefined) return NodeState.Hidden;
-                    GetAdvancementProgressRaw(def.techLevel, DefsOf.Main, out int finished, out int total);
-                    if (finished != total) return NodeState.Hidden;
+                    var progress = GetAdvancementProgressRaw(def.techLevel, DefsOf.Main, out _, out _);
+                    var threshold = BetterResearchMenuMod.settings.advancementTiedTo == AdvancementType.EraCompletion ? BetterResearchMenuMod.settings.eraCompletionPercentage : 1f;
+                    if (progress < threshold) return NodeState.Hidden;
                 }
             }
 
