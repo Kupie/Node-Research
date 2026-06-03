@@ -158,30 +158,6 @@ namespace BetterResearchMenu
                         }
                     }
                 }
-                else
-                {
-                    var prereqSet = new HashSet<ResearchProjectDef>();
-                    for (int i = 0; i < eraProjects.Count; i++)
-                    {
-                        var pList = eraProjects[i].prerequisites;
-                        if (pList != null)
-                        {
-                            for (int j = 0; j < pList.Count; j++)
-                            {
-                                prereqSet.Add(pList[j]);
-                            }
-                        }
-                    }
-
-                    for (int i = 0; i < eraProjects.Count; i++)
-                    {
-                        if (!prereqSet.Contains(eraProjects[i]))
-                        {
-                            prereqs.Add(eraProjects[i]);
-                        }
-                    }
-                }
-
                 def.prerequisites.AddRange(prereqs);
             }
         }
