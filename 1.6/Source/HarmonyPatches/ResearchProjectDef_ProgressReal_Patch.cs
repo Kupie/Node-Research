@@ -9,10 +9,17 @@ namespace BetterResearchMenu
     {
         public static void Postfix(ResearchProjectDef __instance, ref float __result)
         {
-            var ext = __instance.GetModExtension<EmergenceExtension>();
-            if (ext != null && Faction.OfPlayerSilentFail != null && Faction.OfPlayerSilentFail.def.techLevel > __instance.techLevel)
+            try
             {
-                __result = __instance.Cost;
+                var ext = __instance.GetModExtension<EmergenceExtension>();
+                if (ext != null && Faction.OfPlayerSilentFail != null && Faction.OfPlayerSilentFail.def.techLevel > __instance.techLevel)
+                {
+                    __result = __instance.Cost;
+                }
+            }   
+            catch
+            {
+
             }
         }
     }
