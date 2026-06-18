@@ -33,8 +33,8 @@ namespace BetterResearchMenu
         public float emergenceCostUltra = 40000f;
         public float emergenceCostArchotech = 100000f;
 
-        public float spacingForceMultiplier = 1f;
-        public float contractingForceMultiplier = 1f;
+        public float spacingForceMultiplier = 1.634f;
+        public float contractingForceMultiplier = 1.09f;
         public float centerForceMultiplier = 1f;
         public override void ExposeData()
         {
@@ -65,8 +65,8 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref emergenceCostUltra, "emergenceCostUltra", 40000f);
             Scribe_Values.Look(ref emergenceCostArchotech, "emergenceCostArchotech", 100000f);
 
-            Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1f);
-            Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1f);
+            Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1.634f);
+            Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1.09f);
             Scribe_Values.Look(ref centerForceMultiplier, "centerForceMultiplier", 1f);
         }
 
