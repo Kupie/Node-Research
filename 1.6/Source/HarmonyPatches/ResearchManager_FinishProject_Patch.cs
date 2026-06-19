@@ -10,6 +10,25 @@ namespace BetterResearchMenu
     {
         public static void Postfix(ResearchProjectDef proj)
         {
+            // Advance research queue
+            State.researchQueue.Remove(proj.defName);
+            while (State.researchQueue.Count > 0)
+            {
+                var nextDefName = State.researchQueue[0];
+                var nextDef = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(nextDefName);
+                if (nextDef == null || nextDef.IsFinished)
+                {
+                    State.researchQueue.RemoveAt(0);
+                    continue;
+                }
+                if (nextDef.CanStartNow)
+                {
+                    Find.ResearchManager.SetCurrentProject(nextDef);
+                    TutorSystem.Notify_Event("StartResearchProject");
+                }
+                break;
+            }
+
             if (BetterResearchMenuMod.settings.collapseOnCompletion)
             {
                 State.nodeStates[proj.defName] = NodeState.Minimized;

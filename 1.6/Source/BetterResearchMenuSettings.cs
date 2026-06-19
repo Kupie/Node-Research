@@ -36,6 +36,10 @@ namespace BetterResearchMenu
         public float spacingForceMultiplier = 1.634f;
         public float contractingForceMultiplier = 1.09f;
         public float centerForceMultiplier = 1f;
+
+        public bool autoRevealNodes = false;
+        public float wasdPanSpeed = 15f;
+        public float zoomSensitivity = 0.05f;
         public override void ExposeData()
         {
             base.ExposeData();
@@ -68,6 +72,10 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref spacingForceMultiplier, "spacingForceMultiplier", 1.634f);
             Scribe_Values.Look(ref contractingForceMultiplier, "contractingForceMultiplier", 1.09f);
             Scribe_Values.Look(ref centerForceMultiplier, "centerForceMultiplier", 1f);
+
+            Scribe_Values.Look(ref autoRevealNodes, "autoRevealNodes", false);
+            Scribe_Values.Look(ref wasdPanSpeed, "wasdPanSpeed", 15f);
+            Scribe_Values.Look(ref zoomSensitivity, "zoomSensitivity", 0.05f);
         }
 
         public float GetEmergenceCost(TechLevel level)

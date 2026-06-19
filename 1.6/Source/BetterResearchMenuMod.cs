@@ -88,6 +88,7 @@ namespace BetterResearchMenu
             ls.Gap();
             ls.CheckboxLabeled("BRM_RevealAllInGodMode".Translate(), ref settings.revealAllInGodMode);
             ls.CheckboxLabeled("BRM_RevealMysteryNodeOnHover".Translate(), ref settings.revealMysteryNodeOnHover);
+            ls.CheckboxLabeled("BRM_AutoRevealNodes".Translate(), ref settings.autoRevealNodes);
             ls.CheckboxLabeled("BRM_EnableEmergence".Translate(), ref settings.enableEmergence);
 
             if (settings.enableEmergence)
@@ -121,6 +122,13 @@ namespace BetterResearchMenu
             {
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);
             }
+
+            ls.Gap();
+            ls.Label("BRM_WASDPanSpeed".Translate(settings.wasdPanSpeed.ToString("F0")));
+            settings.wasdPanSpeed = ls.Slider(settings.wasdPanSpeed, 0f, 60f);
+
+            ls.Label("Zoom sensitivity: " + (settings.zoomSensitivity * 200f).ToString("F0"));
+            settings.zoomSensitivity = ls.Slider(settings.zoomSensitivity, 0.005f, 0.1f);
         }
 
         public override void WriteSettings()

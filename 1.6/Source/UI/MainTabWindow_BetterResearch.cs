@@ -89,6 +89,13 @@ namespace BetterResearchMenu
     [StaticConstructorOnStartup]
     public class MainTabWindow_BetterResearch : MainTabWindow_Research
     {
+        public MainTabWindow_BetterResearch()
+        {
+			
+			// Hitting "Enter" in the search bar would init hitting the "Accept" system in Rimworld; had to disable closing on accept to make "Enter to instant search" work
+            closeOnAccept = false;
+        }
+
         private static Texture2D TexBubble = ContentFinder<Texture2D>.Get("UI/Bubble");
         private static Texture2D TexGreenBubble = ContentFinder<Texture2D>.Get("UI/GreenBubble");
         private static Texture2D TexOrangeBubble = ContentFinder<Texture2D>.Get("UI/OrangeBubble");
@@ -146,6 +153,7 @@ namespace BetterResearchMenu
         private float RightPanelWidth = 300f;
         private float NodeSizeExpanded = 80f;
         private float BottomBarHeight => GetActiveProjectsCached(CurTab).Count > 0 ? 80f : 40f;
+        private const float QueueBarHeight = 36f;
 
         public static bool GodModeReveal => BetterResearchMenuMod.settings.revealAllInGodMode && DebugSettings.godMode;
         private float NodeSizeMinimized = 40f;
@@ -178,8 +186,18 @@ namespace BetterResearchMenu
         private static float[] centerForceBaseCache = new float[1000];
         private static float[] invMassCache = new float[1000];
         private bool isPanning;
+        private int queueDragIndex = -1;
+        private Vector3 savedCameraPos;
+        private float savedCameraSize;
+        private float queueDragStartX;
+        private float queueDragCurrentX;
+        private float queueScrollOffset;
         private static Vector2 cameraOffset;
         private float zoom = 1f;
+        private float targetZoom = 1f;
+        private bool zoomAnchoring = false;
+        private Vector2 zoomAnchorScreen;
+        private Vector2 zoomAnchorWorld;
         private int lastStateCheckHash = -1;
         private ResearchTabDef lastCurTab;
         private static TechLevel currentEra = TechLevel.Undefined;
@@ -403,6 +421,11 @@ namespace BetterResearchMenu
         {
             Startup.Collapse();
             base.PreOpen();
+            if (Find.CameraDriver != null)
+            {
+                savedCameraPos = Find.CameraDriver.rootPos;
+                savedCameraSize = Find.CameraDriver.rootSize;
+            }
             if (CurTab == null) CurTab = DefsOf.Main;
             lastCurTab = CurTab;
             appliedSearchActive = false;
@@ -432,9 +455,20 @@ namespace BetterResearchMenu
                 physicsTemperature = 0f;
                 fastForwardTicks = 0;
                 zoom = 1f;
+                targetZoom = 1f;
+                zoomAnchoring = false;
             }
 
             InitPhysics(true);
+        }
+
+        public override void PostClose()
+        {
+            base.PostClose();
+            if (Find.CameraDriver != null)
+            {
+                Find.CameraDriver.SetRootPosAndSize(savedCameraPos, savedCameraSize);
+            }
         }
 
         public void ForceEra(TechLevel era)
@@ -444,6 +478,8 @@ namespace BetterResearchMenu
             selectedNode = null;
             selectedProject = null;
             zoom = 1f;
+            targetZoom = 1f;
+            zoomAnchoring = false;
             InitPhysics(true);
         }
 
@@ -497,6 +533,9 @@ namespace BetterResearchMenu
                 node.canStartNowCache = def.CanStartNow;
                 node.isLockedCache = !node.canStartNowCache && !node.isFinishedCache;
                 node.cachedSubLabel = BuildNodeSubLabel(node);
+
+                if (node.state != NodeState.Hidden && BetterResearchMenuMod.settings.autoRevealNodes)
+                    (State.openedNodes ??= new HashSet<string>()).Add(def.defName);
 
                 if (State.nodePositions.TryGetValue(cacheKey, out var savedPos))
                 {
@@ -920,6 +959,9 @@ namespace BetterResearchMenu
                 }
             }
 
+            if (BetterResearchMenuMod.settings.autoRevealNodes)
+                return NodeState.Expanded;
+
             if (State.nodeStates.TryGetValue(def.defName, out var state))
                 return state;
 
@@ -967,6 +1009,7 @@ namespace BetterResearchMenu
         public override void WindowUpdate()
         {
             base.WindowUpdate();
+
             var currentFilterText = quickSearchWidget.filter.Text;
             if (currentFilterText != lastFilterText)
             {
@@ -993,6 +1036,8 @@ namespace BetterResearchMenu
             {
                 lastCurTab = CurTab;
                 zoom = 1f;
+                targetZoom = 1f;
+                zoomAnchoring = false;
                 InitPhysics(true);
             }
 
@@ -1126,6 +1171,8 @@ namespace BetterResearchMenu
                     selectedNode = null;
                     selectedProject = null;
                     zoom = 1f;
+                    targetZoom = 1f;
+                    zoomAnchoring = false;
                     anyChanged = true;
                 }
 
@@ -1419,7 +1466,7 @@ namespace BetterResearchMenu
                 cameraOffset.x += (panelWidth - prevPanelWidth) / 2f / zoom;
                 prevPanelWidth = panelWidth;
             }
-            graphRect = new Rect(0f, TopBarHeight, inRect.width - panelWidth, inRect.height - TopBarHeight - BottomBarHeight);
+            graphRect = new Rect(0f, TopBarHeight, inRect.width - panelWidth, inRect.height - TopBarHeight - BottomBarHeight - QueueBarHeight);
 
             float leftBarShift = LeftBarVisible ? 45f : 5f;
 
@@ -1596,10 +1643,91 @@ namespace BetterResearchMenu
                         }
                         else if (selectedNode.state == NodeState.Expanded)
                         {
-                            if (!GodModeReveal && selectedNode.isLockedCache)
+                            if (!GodModeReveal && selectedNode.isLockedCache && !Event.current.shift)
                             {
-                                var reasons = GetLockedReasons(selectedNode.def);
-                                Messages.Message("Locked".Translate() + (reasons.Count > 0 ? ": " + reasons[0] : ""), MessageTypeDefOf.RejectInput, false);
+                                // Locked only by missing research prerequisites: queue the chain
+                                // Locked by anything else (era, study, mechanitor, other shit): show message
+                                bool onlyMissingPrereqs = !selectedNode.def.PrerequisitesCompleted
+                                    && selectedNode.def.TechprintRequirementMet
+                                    && selectedNode.def.PlayerMechanitorRequirementMet
+                                    && selectedNode.def.AnalyzedThingsRequirementsMet
+                                    && !(BetterResearchMenuMod.settings.restrictResearchToTechLevel && selectedNode.def.techLevel > Faction.OfPlayer.def.techLevel);
+                                if (onlyMissingPrereqs)
+                                {
+                                    var chain = GetPrerequisiteChain(selectedNode.def);
+                                    if (chain.Count > 0)
+                                    {
+                                        State.researchQueue.Clear();
+                                        foreach (var dep in chain)
+                                            if (!dep.IsFinished && !State.researchQueue.Contains(dep.defName))
+                                                State.researchQueue.Add(dep.defName);
+                                        if (State.researchQueue.Count > 0)
+                                        {
+                                            var firstDef = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[0]);
+                                            if (firstDef != null && firstDef.CanStartNow)
+                                            {
+                                                Find.ResearchManager.SetCurrentProject(firstDef);
+                                                TutorSystem.Notify_Event("StartResearchProject");
+                                            }
+                                        }
+                                        Messages.Message("BRM_QueuedResearch".Translate(selectedNode.def.LabelCap, chain.Count), MessageTypeDefOf.TaskCompletion, false);
+                                    }
+                                }
+                                else
+                                {
+                                    var reasons = GetLockedReasons(selectedNode.def);
+                                    Messages.Message("Locked".Translate() + (reasons.Count > 0 ? ": " + reasons[0] : ""), MessageTypeDefOf.RejectInput, false);
+                                }
+                            }
+                            else if (Event.current.shift && !selectedNode.def.IsFinished && !GetActiveProjectsCached(CurTab).Contains(selectedNode.def))
+                            {
+                                // Block shift+queue if locked by non-prerequisite reason
+                                bool shiftOnlyMissingPrereqs = !selectedNode.def.PrerequisitesCompleted
+                                    && selectedNode.def.TechprintRequirementMet
+                                    && selectedNode.def.PlayerMechanitorRequirementMet
+                                    && selectedNode.def.AnalyzedThingsRequirementsMet
+                                    && !(BetterResearchMenuMod.settings.restrictResearchToTechLevel && selectedNode.def.techLevel > Faction.OfPlayer.def.techLevel);
+                                if (selectedNode.isLockedCache && !shiftOnlyMissingPrereqs)
+                                {
+                                    var shiftReasons = GetLockedReasons(selectedNode.def);
+                                    Messages.Message("Locked".Translate() + (shiftReasons.Count > 0 ? ": " + shiftReasons[0] : ""), MessageTypeDefOf.RejectInput, false);
+                                }
+                                else
+                                {
+                                    var chain = GetPrerequisiteChain(selectedNode.def);
+                                    if (chain.Count == 0)
+                                    {
+                                        Messages.Message("BRM_QueueAlreadyFinished".Translate(), MessageTypeDefOf.RejectInput, false);
+                                    }
+                                    else
+                                    {
+                                        int added = 0;
+                                        foreach (var dep in chain)
+                                        {
+                                            if (!State.researchQueue.Contains(dep.defName) && !dep.IsFinished)
+                                            {
+                                                State.researchQueue.Add(dep.defName);
+                                                added++;
+                                            }
+                                        }
+
+                                        if (Find.ResearchManager.currentProj == null && State.researchQueue.Count > 0)
+                                        {
+                                            var firstDefName = State.researchQueue[0];
+                                            var firstDef = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(firstDefName);
+                                            if (firstDef != null && firstDef.CanStartNow)
+                                            {
+                                                Find.ResearchManager.SetCurrentProject(firstDef);
+                                                TutorSystem.Notify_Event("StartResearchProject");
+                                            }
+                                        }
+
+                                        if (added > 0)
+                                            Messages.Message("BRM_QueuedResearch".Translate(selectedNode.def.LabelCap, added), MessageTypeDefOf.TaskCompletion, false);
+                                        else
+                                            Messages.Message("BRM_QueueAlreadyQueued".Translate(selectedNode.def.LabelCap), MessageTypeDefOf.NeutralEvent, false);
+                                    }
+                                }
                             }
                             else if (selectedNode.canStartNowCache && !GetActiveProjectsCached(CurTab).Contains(selectedNode.def))
                             {
@@ -1611,6 +1739,7 @@ namespace BetterResearchMenu
                                 }
                                 else
                                 {
+                                    State.researchQueue.Clear();
                                     AttemptBeginResearch(selectedNode.def);
                                 }
                             }
@@ -1756,7 +1885,7 @@ namespace BetterResearchMenu
                             {
                                 GUI.DrawTexture(buttonRect.ContractedBy(4f * zoom), TexLock);
                             }
-                            else if (node.isPhantom is false && State.openedNodes.Contains(node.def.defName))
+                            else if (node.isPhantom is false && (BetterResearchMenuMod.settings.autoRevealNodes || State.openedNodes.Contains(node.def.defName)))
                             {
                                 DrawBubble(buttonRect, node.def, 4f * zoom, activeProjects, drawSilhouette: true);
                             }
@@ -1797,6 +1926,17 @@ namespace BetterResearchMenu
             }
 
             DrawGraphControls(controlAreaRect);
+
+            // Intercept Enter/Return before the search widget can consume the event
+            if (!GUI.GetNameOfFocusedControl().NullOrEmpty() &&
+                Event.current.type == EventType.KeyDown &&
+                (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter))
+            {
+                lastSearchTypingTime = 0f;
+                GUI.FocusControl(null);
+                Event.current.Use();
+            }
+
             quickSearchWidget.OnGUI(searchBarRect);
 
             Widgets.EndGroup();
@@ -1805,6 +1945,7 @@ namespace BetterResearchMenu
             {
                 DrawAdvanceButton(inRect);
                 DrawTopBar(inRect);
+                DrawQueueBar(inRect);
                 DrawLeftBar(inRect);
             }
             DrawBottomBar(inRect);
@@ -1825,7 +1966,8 @@ namespace BetterResearchMenu
 
         private void HandleInputs(Rect graphRect, Rect sliderExcl, Rect panelExcl, Rect searchBarExcl, Rect inRect)
         {
-            float zoomSensitivity = 0.05f;
+            float zoomSensitivity = BetterResearchMenuMod.settings.zoomSensitivity;
+            float zoomSmoothSpeed = 12f;
             float minZoom = 0.05f;
             float maxZoom = 3f;
 
@@ -1844,14 +1986,57 @@ namespace BetterResearchMenu
             }
 
             Vector2 localMousePos = mousePos - new Vector2(graphRect.x, graphRect.y);
+            var pivot = new Vector2(graphRect.width / 2f, (inRect.height - TopBarHeight - 40f) / 2f);
+
+            void StartSmoothZoom(float wheelDelta, Vector2 anchorScreen)
+            {
+                zoomAnchorScreen = anchorScreen;
+                zoomAnchorWorld = ((anchorScreen - pivot) / zoom) - cameraOffset;
+                targetZoom = Mathf.Clamp(targetZoom - wheelDelta * zoomSensitivity, minZoom, maxZoom);
+                zoomAnchoring = true;
+            }
 
             if (Event.current.type == EventType.MouseDown)
                 lastMousePos = localMousePos;
+
             if (Event.current.type == EventType.ScrollWheel && graphRect.Contains(Event.current.mousePosition))
             {
-                zoom -= Event.current.delta.y * zoomSensitivity;
-                zoom = Mathf.Clamp(zoom, minZoom, maxZoom);
+                StartSmoothZoom(Event.current.delta.y, localMousePos);
                 Event.current.Use();
+            }
+
+            if (GUI.GetNameOfFocusedControl().NullOrEmpty())
+            {
+                bool zoomInDown = KeyBindingDefOf.MapZoom_In.IsDown;
+                bool zoomOutDown = KeyBindingDefOf.MapZoom_Out.IsDown;
+                bool anyZoomKeyDown = zoomInDown || zoomOutDown;
+
+                if (anyZoomKeyDown && Event.current.type == EventType.KeyDown)
+                    Event.current.Use();
+
+                if (anyZoomKeyDown && Event.current.type == EventType.Repaint)
+                {
+                    Vector2 anchor = graphRect.Contains(mousePos) ? localMousePos : pivot;
+                    float keyboardDelta = 0f;
+                    if (zoomInDown) keyboardDelta -= Time.deltaTime * 60f;
+                    if (zoomOutDown) keyboardDelta += Time.deltaTime * 60f;
+                    StartSmoothZoom(keyboardDelta, anchor);
+                }
+            }
+
+            if (Event.current.type == EventType.Repaint && Mathf.Abs(targetZoom - zoom) > 0.0001f)
+            {
+                zoom = Mathf.Lerp(zoom, targetZoom, Mathf.Clamp01(Time.deltaTime * zoomSmoothSpeed));
+                if (zoomAnchoring)
+                {
+                    cameraOffset = ((zoomAnchorScreen - pivot) / zoom) - zoomAnchorWorld;
+                    cachedCameraOffsets[$"{CurTab.defName}_{currentEra}_{GodModeReveal}"] = cameraOffset;
+                }
+                if (Mathf.Abs(targetZoom - zoom) <= 0.0005f)
+                {
+                    zoom = targetZoom;
+                    zoomAnchoring = false;
+                }
             }
 
             if (!sliderExcl.Contains(localMousePos) && !searchBarExcl.Contains(localMousePos) && isPanning && Event.current.type == EventType.MouseDrag)
@@ -1864,6 +2049,36 @@ namespace BetterResearchMenu
             else if (Event.current.type == EventType.MouseDrag)
             {
                 lastMousePos = localMousePos;
+            }
+
+            // Camera pan using the player's configured dolly keybindings.
+            // Gate on Repaint so we apply exactly once per rendered frame
+			// Why not just do this on update() with deltatime? lolidk that ate my keystrokes for some reason and wouldn't fuckin work
+            // In theory we consume the key event so the camera doesn't move in the background, but that didn't work either... 
+			// So I just have it reset the camera to what it was on PreOpen() lmao best coder ever
+            if (GUI.GetNameOfFocusedControl().NullOrEmpty() && BetterResearchMenuMod.settings.wasdPanSpeed > 0f)
+            {
+                bool anyDown = KeyBindingDefOf.MapDolly_Up.IsDown || KeyBindingDefOf.MapDolly_Down.IsDown ||
+                              KeyBindingDefOf.MapDolly_Left.IsDown || KeyBindingDefOf.MapDolly_Right.IsDown;
+
+                if (anyDown && Event.current.type == EventType.KeyDown)
+                    Event.current.Use();
+
+                if (anyDown && Event.current.type == EventType.Repaint)
+                {
+                    float panSpeed = BetterResearchMenuMod.settings.wasdPanSpeed * Time.deltaTime * 60f / zoom;
+                    bool moved = false;
+                    if (KeyBindingDefOf.MapDolly_Up.IsDown)    { cameraOffset.y += panSpeed; moved = true; }
+                    if (KeyBindingDefOf.MapDolly_Down.IsDown)  { cameraOffset.y -= panSpeed; moved = true; }
+                    if (KeyBindingDefOf.MapDolly_Left.IsDown)  { cameraOffset.x += panSpeed; moved = true; }
+                    if (KeyBindingDefOf.MapDolly_Right.IsDown) { cameraOffset.x -= panSpeed; moved = true; }
+                    if (moved)
+                    {
+                        // Keep camera frozen in place
+                        PostClose();
+                        cachedCameraOffsets[$"{CurTab.defName}_{currentEra}_{GodModeReveal}"] = cameraOffset;
+                    }
+                }
             }
         }
 
@@ -1917,6 +2132,8 @@ namespace BetterResearchMenu
                         currentEra = techLevel;
                         selectionLocked = false;
                         zoom = 1f;
+                        targetZoom = 1f;
+                        zoomAnchoring = false;
                         InitPhysics(true);
                         SoundDefOf.TabOpen.PlayOneShotOnCamera();
                     }
@@ -2170,6 +2387,380 @@ namespace BetterResearchMenu
             Text.Font = GameFont.Small;
         }
 
+        private void DrawQueueBar(Rect inRect)
+        {
+            var currentProj = Find.ResearchManager?.currentProj;
+            if (State.researchQueue.Count == 0 && currentProj == null)
+            {
+                queueDragIndex = -1;
+                return;
+            }
+
+            float barHeight = QueueBarHeight;
+            float y = inRect.height - BottomBarHeight - barHeight;
+            var barRect = new Rect(0f, y, inRect.width, barHeight);
+            Widgets.DrawBoxSolid(barRect, ColorTechLevelTab);
+
+            float bubbleSize = barHeight - 8f;
+            float itemPadding = 4f;
+            float labelWidth = 150f;
+            float itemWidth = bubbleSize + itemPadding + labelWidth + 16f;
+
+            // Start after left bar if visible
+            float xStart = (LeftBarVisible ? 45f : 0f) + 8f;
+
+            // "Queue:" label
+            Text.Font = GameFont.Tiny;
+            Text.Anchor = TextAnchor.MiddleLeft;
+            GUI.color = new Color(1f, 1f, 1f, 0.5f);
+            Widgets.Label(new Rect(xStart, y + 2f, 50f, barHeight - 4f), "Queue:");
+            GUI.color = Color.white;
+            xStart += 54f;
+
+            // Cull finished entries from queue
+            State.researchQueue.RemoveAll(d =>
+            {
+                var dd = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(d);
+                return dd == null || dd.IsFinished;
+            });
+            // Also remove currentProj from queue if it's in there (it's already active)
+            if (currentProj != null)
+                State.researchQueue.Remove(currentProj.defName);
+
+            var activeProjs = GetActiveProjectsCached(CurTab);
+            var mousePos = Event.current.mousePosition;
+
+            // Build unified display list: currentProj at index 0, then queue
+            // displayIndex 0 = currentProj (or null), displayIndex 1..n = queue items
+            int totalDisplay = (currentProj != null ? 1 : 0) + State.researchQueue.Count;
+
+            float queueViewportLeft = xStart;
+            float queueViewportRight = inRect.width - 8f;
+            float queueViewportWidth = Mathf.Max(0f, queueViewportRight - queueViewportLeft);
+            float queueContentWidth = totalDisplay * itemWidth;
+            float maxQueueScrollOffset = Mathf.Max(0f, queueContentWidth - queueViewportWidth);
+            queueScrollOffset = Mathf.Clamp(queueScrollOffset, 0f, maxQueueScrollOffset);
+
+            if (Event.current.type == EventType.ScrollWheel && barRect.Contains(mousePos) && maxQueueScrollOffset > 0f)
+            {
+                queueScrollOffset = Mathf.Clamp(queueScrollOffset + Event.current.delta.y * 48f, 0f, maxQueueScrollOffset);
+                Event.current.Use();
+            }
+
+            // Build item rects for hit-testing (only fully visible ones)
+            var itemRects = new List<(int displayIndex, Rect rect)>();
+            float x = xStart - queueScrollOffset;
+            for (int i = 0; i < totalDisplay; i++)
+            {
+                if (x >= queueViewportLeft && x + itemWidth <= queueViewportRight)
+                    itemRects.Add((i, new Rect(x, y, itemWidth, barHeight)));
+
+                x += itemWidth;
+            }
+
+            ResearchProjectDef GetDisplayDef(int displayIndex)
+            {
+                if (displayIndex < 0 || State.researchQueue == null)
+                    return null;
+
+                if (currentProj != null)
+                {
+                    if (displayIndex == 0) return currentProj;
+                    int qIdx = displayIndex - 1;
+                    if (qIdx < 0 || qIdx >= State.researchQueue.Count)
+                        return null;
+                    return DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[qIdx]);
+                }
+
+                if (displayIndex >= State.researchQueue.Count)
+                    return null;
+                return DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[displayIndex]);
+            }
+
+            bool IsCurrentResearch(ResearchProjectDef def)
+            {
+                var active = Find.ResearchManager?.currentProj;
+                return def != null && active != null && active.defName == def.defName;
+            }
+
+            void ClearCurrentResearch()
+            {
+                if (Find.ResearchManager != null)
+                    Traverse.Create(Find.ResearchManager).Field("currentProj").SetValue(null);
+            }
+
+            bool PromoteNextQueuedProject()
+            {
+                while (State.researchQueue.Count > 0)
+                {
+                    var nextDefName = State.researchQueue[0];
+                    State.researchQueue.RemoveAt(0);
+
+                    var nextDef = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(nextDefName);
+                    if (nextDef == null || nextDef.IsFinished)
+                        continue;
+
+                    if (nextDef.CanStartNow)
+                    {
+                        Find.ResearchManager.SetCurrentProject(nextDef);
+                        TutorSystem.Notify_Event("StartResearchProject");
+                        return true;
+                    }
+
+                    State.researchQueue.Insert(0, nextDefName);
+                    break;
+                }
+
+                ClearCurrentResearch();
+                return false;
+            }
+
+            // --- Drag logic ---
+            if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+            {
+                foreach (var (idx, rect) in itemRects)
+                {
+                    if (rect.Contains(mousePos))
+                    {
+                        queueDragIndex = idx;
+                        queueDragStartX = rect.x;
+                        queueDragCurrentX = rect.x;
+                        Event.current.Use();
+                        break;
+                    }
+                }
+            }
+            else if (Event.current.type == EventType.MouseDrag && queueDragIndex >= 0)
+            {
+                queueDragCurrentX += Event.current.delta.x;
+                Event.current.Use();
+            }
+            else if (Event.current.type == EventType.MouseUp && queueDragIndex >= 0)
+            {
+                // Find drop position by imagining the dragged item removed and seeing where
+                // the ghost's left edge falls among the remaining slots.
+                // Build positions of non-dragged items in their display order.
+                float ghostLeft = queueDragCurrentX;
+                var otherRects = itemRects.Where(r => r.displayIndex != queueDragIndex).ToList();
+                int dropIndex = queueDragIndex; // default: no move
+
+                if (otherRects.Count > 0)
+                {
+                    // Find which gap the ghost's left edge falls into
+                    // gaps: before first, between each pair, after last
+                    int insertBefore = otherRects.Count; // default: after all others
+                    for (int i = 0; i < otherRects.Count; i++)
+                    {
+                        if (ghostLeft < otherRects[i].rect.x + itemWidth * 0.5f)
+                        {
+                            insertBefore = i;
+                            break;
+                        }
+                    }
+
+                    // Convert insertBefore (index into otherRects) to a displayIndex
+                    // If inserting before item i in otherRects, the new displayIndex is that item's displayIndex
+                    // adjusted for the fact that the dragged item will be removed first.
+                    if (insertBefore < otherRects.Count)
+                    {
+                        int targetDisplay = otherRects[insertBefore].displayIndex;
+                        // If dragging rightward, the target's displayIndex will shift down by 1 after removal
+                        dropIndex = targetDisplay > queueDragIndex ? targetDisplay - 1 : targetDisplay;
+                    }
+                    else
+                    {
+                        // After all others: last other item's displayIndex, adjusted
+                        int lastDisplay = otherRects[otherRects.Count - 1].displayIndex;
+                        dropIndex = lastDisplay > queueDragIndex ? lastDisplay - 1 : lastDisplay;
+                    }
+                }
+
+                if (dropIndex != queueDragIndex)
+                {
+                    var draggedDef = GetDisplayDef(queueDragIndex);
+                    if (draggedDef != null)
+                    {
+                        bool wasCurrent = currentProj != null && queueDragIndex == 0;
+
+                        // Current proj chain is just itself — prereqs are already done.
+                        // Queue item chain includes any of its queued prerequisites.
+                        var chain = wasCurrent
+                            ? new List<string> { draggedDef.defName }
+                            : GetPrerequisiteChain(draggedDef)
+                                .Where(d => State.researchQueue.Contains(d.defName))
+                                .Select(d => d.defName)
+                                .ToList();
+
+                        foreach (var name in chain)
+                            State.researchQueue.Remove(name);
+
+                        if (dropIndex == 0)
+                        {
+                            // Dropping onto the current slot: promote first of chain to current,
+                            // push the old current (if any) to the front of the queue.
+                            var newCurrentDef = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(chain[0]);
+                            chain.RemoveAt(0);
+                            if (currentProj != null)
+                                State.researchQueue.Insert(0, currentProj.defName);
+                            State.researchQueue.InsertRange(0, chain);
+                            if (newCurrentDef != null && newCurrentDef.CanStartNow)
+                            {
+                                Find.ResearchManager.SetCurrentProject(newCurrentDef);
+                                TutorSystem.Notify_Event("StartResearchProject");
+                            }
+                        }
+                        else
+                        {
+                            // Dropping into the queue. Subtract 1 from dropIndex when there's a
+                            // current-slot item taking up display position 0.
+                            int queueInsertAt = dropIndex - (currentProj != null && !wasCurrent ? 1 : 0);
+
+                            // Can't insert after an item that depends on our chain
+                            int maxInsert = State.researchQueue.Count;
+                            for (int i = 0; i < State.researchQueue.Count; i++)
+                            {
+                                var item = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[i]);
+                                if (item != null)
+                                {
+                                    var itemPrereqs = GetPrerequisiteChain(item).Select(d => d.defName).ToList();
+                                    if (chain.Any(c => itemPrereqs.Contains(c)))
+                                    {
+                                        maxInsert = i;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Can't insert before an item that our chain depends on
+                            int minInsert = 0;
+                            for (int i = 0; i < State.researchQueue.Count; i++)
+                            {
+                                var item = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[i]);
+                                if (item != null && chain.Any(c =>
+                                {
+                                    var d = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(c);
+                                    return d != null && GetPrerequisiteChain(d).Any(p => p.defName == item.defName);
+                                }))
+                                    minInsert = i + 1;
+                            }
+
+                            queueInsertAt = Mathf.Clamp(queueInsertAt, minInsert, maxInsert);
+                            State.researchQueue.InsertRange(queueInsertAt, chain);
+
+                            // If current research was moved into queue, start whatever is now first
+                            if (wasCurrent && State.researchQueue.Count > 0)
+                            {
+                                var newFirst = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(State.researchQueue[0]);
+                                if (newFirst != null && newFirst.CanStartNow)
+                                {
+                                    Find.ResearchManager.SetCurrentProject(newFirst);
+                                    TutorSystem.Notify_Event("StartResearchProject");
+                                }
+                            }
+                        }
+
+                        SoundDefOf.Click.PlayOneShotOnCamera();
+                    }
+                }
+
+                queueDragIndex = -1;
+                Event.current.Use();
+            }
+
+            // --- Draw items ---
+            x = xStart - queueScrollOffset;
+            for (int i = 0; i < totalDisplay; i++)
+            {
+                if (x + itemWidth < queueViewportLeft) { x += itemWidth; continue; }
+                if (x > queueViewportRight) break;
+                if (x < queueViewportLeft || x + itemWidth > queueViewportRight) { x += itemWidth; continue; }
+
+                var def = GetDisplayDef(i);
+                if (def == null) { x += itemWidth; continue; }
+
+                bool isCurrent = currentProj != null && i == 0;
+                bool isDragging = queueDragIndex == i;
+                float drawX = isDragging ? queueDragCurrentX : x;
+
+                // Drop insertion indicator
+                if (queueDragIndex >= 0 && !isDragging)
+                {
+                    float midDrag = queueDragCurrentX + itemWidth / 2f;
+                    float midThis = x + itemWidth / 2f;
+                    float midPrev = x - itemWidth / 2f;
+                    if (midDrag >= midPrev && midDrag < midThis)
+                    {
+                        GUI.color = new Color(1f, 1f, 0.3f, 0.8f);
+						// Widgets.DrawLineVertical(x - 2f, y + 4f, barHeight - 8f);
+						Widgets.DrawLine(new Vector2(x - 8f, y + 4f), new Vector2(x - 8f, y + barHeight + 4f), Color.yellow, 3f);
+
+						GUI.color = Color.white;
+                    }
+                }
+
+                // Highlight current research slot
+                if (isCurrent && !isDragging)
+                {
+                    GUI.color = new Color(0.4f, 0.8f, 0.4f, 0.15f);
+                    Widgets.DrawBoxSolid(new Rect(x, y, itemWidth, barHeight), GUI.color);
+                    GUI.color = Color.white;
+                }
+
+                if (isDragging)
+                    GUI.color = new Color(1f, 1f, 1f, 0.5f);
+
+                var bubbleRect = new Rect(drawX, y + 4f, bubbleSize, bubbleSize);
+                DrawBubble(bubbleRect, def, 2f, activeProjs);
+
+                Text.Font = GameFont.Tiny;
+                GUI.color = isDragging ? new Color(1f, 1f, 1f, 0.2f) : new Color(1f, 1f, 1f, 0.4f);
+                Widgets.Label(new Rect(drawX, y + 1f, bubbleSize, 10f), isCurrent ? "▶" : i.ToString());
+
+                GUI.color = isDragging ? new Color(1f, 1f, 1f, 0.5f) : Color.white;
+                var labelRect = new Rect(drawX + bubbleSize + itemPadding, y + 2f, labelWidth, barHeight - 4f);
+                Widgets.Label(labelRect, def.LabelCap);
+                GUI.color = Color.white;
+
+                // Separator
+                if (!isDragging && i < totalDisplay - 1)
+                {
+                    GUI.color = new Color(1f, 1f, 1f, 0.15f);
+                    Widgets.DrawLineVertical(x + itemWidth - 8f, y + 6f, barHeight - 12f);
+                    GUI.color = Color.white;
+                }
+
+                // Tooltip + right-click to remove
+                var itemRect = new Rect(x, y, itemWidth, barHeight);
+                if (!isDragging)
+                {
+                    string tip = isCurrent
+                        ? "Currently researching  |  Right-click to remove  |  Drag right to queue it"
+                        : "Drag to reorder  |  Right-click to remove: " + def.LabelCap;
+                    TooltipHandler.TipRegion(itemRect, tip);
+
+                    if (Event.current.type == EventType.MouseDown && Event.current.button == 1 && itemRect.Contains(mousePos))
+                    {
+                        bool removedCurrent = IsCurrentResearch(def);
+                        if (removedCurrent && !State.researchQueue.Contains(def.defName))
+                            State.researchQueue.Insert(0, def.defName);
+
+                        RemoveFromQueueCascade(def.defName);
+
+                        if (removedCurrent && Find.ResearchManager.currentProj == null)
+                            PromoteNextQueuedProject();
+
+                        SoundDefOf.Click.PlayOneShotOnCamera();
+                        Event.current.Use();
+                    }
+                }
+
+                x += itemWidth;
+            }
+
+            Text.Anchor = TextAnchor.UpperLeft;
+            Text.Font = GameFont.Small;
+        }
+
         private void DrawGraphControls(Rect controlAreaRect)
         {
             var physicsBtnRect = new Rect(controlAreaRect.x, controlAreaRect.y, ControlBtnSize, ControlBtnSize);
@@ -2253,6 +2844,8 @@ namespace BetterResearchMenu
             lastCurTab = newTab;
             selectionLocked = false;
             zoom = 1f;
+            targetZoom = 1f;
+            zoomAnchoring = false;
             InitPhysics(true);
         }
 
@@ -2366,6 +2959,74 @@ namespace BetterResearchMenu
         }
 
         private float GetAdvancementProgress(out int finished, out int total) => GetAdvancementProgressRaw(Faction.OfPlayer.def.techLevel, this.CurTab, out finished, out total);
+
+        // Removes defName from the queue, then recursively removes anything that depends on it
+		// Recursion is fuckin magical every time I manage to get it working
+        private void RemoveFromQueueCascade(string defName)
+        {
+            if (defName.NullOrEmpty()) return;
+
+            bool removedCurrent = Find.ResearchManager?.currentProj != null && Find.ResearchManager.currentProj.defName == defName;
+            if (removedCurrent)
+                Traverse.Create(Find.ResearchManager).Field("currentProj").SetValue(null);
+
+            bool removedQueued = State.researchQueue.Remove(defName);
+            if (!removedQueued && !removedCurrent) return;
+
+            // Find and remove anything queued that has this as a prerequisite
+            var dependents = State.researchQueue
+                .Where(d =>
+                {
+                    var d2 = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(d);
+                    return d2 != null && GetPrerequisiteChain(d2).Any(p => p.defName == defName);
+                })
+                .ToList();
+            foreach (var dep in dependents)
+                RemoveFromQueueCascade(dep);
+        }
+
+        // Returns the ordered list of unfinished prerequisites needed before def, including def itself.
+        // Order is leaf-first so queue[0] is always the next thing to research.
+        private List<ResearchProjectDef> GetPrerequisiteChain(ResearchProjectDef def)
+        {
+            var result = new List<ResearchProjectDef>();
+            var visited = new HashSet<string>();
+            BuildChain(def, result, visited);
+            return result;
+        }
+
+        private void BuildChain(ResearchProjectDef def, List<ResearchProjectDef> result, HashSet<string> visited)
+        {
+            if (!visited.Add(def.defName)) return;
+            if (def.IsFinished) return;
+
+            if (def.prerequisites != null)
+                foreach (var prereq in def.prerequisites)
+                    BuildChain(prereq, result, visited);
+
+            if (def.hiddenPrerequisites != null)
+                foreach (var prereq in def.hiddenPrerequisites)
+                    BuildChain(prereq, result, visited);
+
+            result.Add(def);
+        }
+
+        private bool CanQueueDespiteLock(ResearchProjectDef def)
+        {
+            if (def == null || def.IsFinished) return false;
+
+            // Queueing locked projects is only allowed when the it's cuz a missing research-prerequisite
+            // Study techprint, mechanitor, and similar non-research gates are still blocked
+            if (!def.TechprintRequirementMet) return false;
+            if (!def.PlayerMechanitorRequirementMet) return false;
+            if (!def.AnalyzedThingsRequirementsMet) return false;
+
+            return !def.PrerequisitesCompleted
+                || (BetterResearchMenuMod.settings.restrictResearchToTechLevel
+                    && def.techLevel > Faction.OfPlayer.def.techLevel
+                    && def.tab != DefsOf.Anomaly
+                    && def.tab != DefsOf.VGE_Gravtech);
+        }
 
         private List<string> GetLockedReasons(ResearchProjectDef proj)
         {

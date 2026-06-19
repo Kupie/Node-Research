@@ -40,6 +40,11 @@
   <BRM_OpenVanillaMenu>Open vanilla research menu</BRM_OpenVanillaMenu>
   <BRM_RevealAllInGodMode>Reveal all nodes in God Mode</BRM_RevealAllInGodMode>
   <BRM_RevealMysteryNodeOnHover>Show details when hovering unknown nodes</BRM_RevealMysteryNodeOnHover>
+  <BRM_AutoRevealNodes>Auto-reveal all nodes (no question or check marks)</BRM_AutoRevealNodes>
+  <BRM_QueuedResearch>Queued {0} ({1} projects added to queue)</BRM_QueuedResearch>
+  <BRM_QueueAlreadyQueued>{0} is already in the research queue</BRM_QueueAlreadyQueued>
+  <BRM_QueueAlreadyFinished>That research is already finished</BRM_QueueAlreadyFinished>
+  <BRM_WASDPanSpeed>Camera pan speed. Set to 0 to disable: {0}</BRM_WASDPanSpeed>
   <BRM_EnableEmergence>Enable 'Emergence' advancing nodes</BRM_EnableEmergence>
   <BRM_EmergenceCostNeolithic>Emergence cost (Neolithic):</BRM_EmergenceCostNeolithic>
   <BRM_EmergenceCostMedieval>Emergence cost (Medieval)</BRM_EmergenceCostMedieval>
