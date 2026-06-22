@@ -12,6 +12,10 @@ namespace BetterResearchMenu
         public bool restrictViewingFutureProjects = true;
         public bool enableTechAdvancement = true;
         public bool disableVFETribalsAdvancement = true;
+		
+		// experimental TG fixes
+		public bool disableTweaksGaloreResearchChanges = false;
+		
         public bool startCollapsed = false;
         public bool neverCollapseFoundations = true;
         public bool physicsEnabled = true;
@@ -48,6 +52,7 @@ namespace BetterResearchMenu
             Scribe_Values.Look(ref restrictViewingFutureProjects, "restrictViewingFutureProjects", true);
             Scribe_Values.Look(ref enableTechAdvancement, "enableTechAdvancement", true);
             Scribe_Values.Look(ref disableVFETribalsAdvancement, "disableVFETribalsAdvancement", true);
+			Scribe_Values.Look(ref disableTweaksGaloreResearchChanges, "disableTweaksGaloreResearchChanges", false);
             Scribe_Values.Look(ref startCollapsed, "startCollapsed", false);
             Scribe_Values.Look(ref neverCollapseFoundations, "neverCollapseFoundations", true);
             Scribe_Values.Look(ref physicsEnabled, "physicsEnabled", true);

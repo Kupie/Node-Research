@@ -5,6 +5,7 @@
   <BRM_RestrictViewingFutureProjects>Hide future research projects</BRM_RestrictViewingFutureProjects>
   <BRM_EnableTechAdvancement>Enable tech advancement system</BRM_EnableTechAdvancement>
   <BRM_DisableVFETribalsAdvancement>Disable VFE Tribals tech advancement</BRM_DisableVFETribalsAdvancement>
+  <BRM_disableTweaksGaloreResearchChanges>Experimental: Disable Tweaks Galore research changes (compat patch)</BRM_disableTweaksGaloreResearchChanges>
   <BRM_StartCollapsed>All research nodes unlocked via scenario start collapsed</BRM_StartCollapsed>
   <BRM_NeverCollapseFoundations>Never auto-collapse foundation nodes</BRM_NeverCollapseFoundations>
   <BRM_CollapseOnCompletion>Collapse node on research completion</BRM_CollapseOnCompletion>

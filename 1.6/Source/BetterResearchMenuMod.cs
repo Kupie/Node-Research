@@ -122,7 +122,14 @@ namespace BetterResearchMenu
             {
                 ls.CheckboxLabeled("BRM_DisableVFETribalsAdvancement".Translate(), ref settings.disableVFETribalsAdvancement);
             }
-
+			
+            if (ModsConfig.IsActive("Neronix17.TweaksGalore"))
+            {
+                ls.CheckboxLabeled("BRM_disableTweaksGaloreResearchChanges".Translate(), ref settings.disableTweaksGaloreResearchChanges);
+            }
+			
+			
+			
             ls.Gap();
             ls.Label("BRM_WASDPanSpeed".Translate(settings.wasdPanSpeed.ToString("F0")));
             settings.wasdPanSpeed = ls.Slider(settings.wasdPanSpeed, 0f, 60f);
